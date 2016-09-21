@@ -4,7 +4,7 @@
 import rospy
 from std_msgs.msg import String, UInt32, Float64, Bool
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Twist, Pose2D, Pose
 from sensor_msgs.msg import Image
 from system_monitor.msg import *
 import threading
@@ -15,6 +15,9 @@ import commands
 import struct
 from geometry_msgs.msg import Twist
 import time,psutil,subprocess,signal
+import tf
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
+import math
 
 HOST = ''#should not be 127.0.0.1 or localhost
 UserSocket_port=20001  #局域网udp命令监听端口
@@ -28,8 +31,8 @@ dataCache = []
 cmd_pub=None
 mapSave_pub=None
 
-maxVel=0.8
-maxTheta=0.4
+maxVel=1.4
+maxTheta=7.2
 mStatus = Status()
 mStatus.brightness = 0.0
 mStatus.imageStatus = False
@@ -45,8 +48,13 @@ mStatusLock = threading.Lock()
 dataCache = []
 currentPose=Pose();
 sendData=bytearray([205,235,215,20,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
+speed_cmd=Twist()
 
 mapthread=None
+navthread=None
+control_flag=False
+
+scaleOrbThread=None
 
 def getDataFromReq(req):
     pass
@@ -91,36 +99,39 @@ def splitReq(req):
     return res
 
 def parseData(cmds):
-    global cmd_pub, maxVel, maxTheta,mapthread
+    global cmd_pub, maxVel, maxTheta,mapthread,speed_cmd,control_flag
+    global scaleOrbThread
     res = None
     for count in range(0, len(cmds)):
+        if len(cmds[count])>0:
+            control_flag=True
         #判断是否为关机命令
         if len(cmds[count])==2:
             if cmds[count][0]==0xaa and cmds[count][1]==0x44:
                 print "system poweroff"
                 status, output = commands.getstatusoutput('sudo shutdown -h now')
-            cmd=Twist()
-            cmd.linear.x = 0
-            cmd.angular.z = 0
+
             if cmds[count][0]==ord('f'):
                 # print "forward"
-                cmd.linear.x=maxVel*cmds[count][1]/100.0
-                cmd_pub.publish(cmd)
+                speed_cmd.linear.x=maxVel*cmds[count][1]/100.0
+                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('b'):
                 # print "back"
-                cmd.linear.x=-maxVel*cmds[count][1]/100.0
-                cmd_pub.publish(cmd)
+                speed_cmd.linear.x=-maxVel*cmds[count][1]/100.0
+                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('c'):
                 # print "circleleft"
-                cmd.linear.z=maxTheta*cmds[count][1]/100.0
-                cmd_pub.publish(cmd)
+                speed_cmd.angular.z=maxTheta*cmds[count][1]/100.0/2.8
+                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('d'):
                 # print "circleright"
-                cmd.linear.z=-maxTheta*cmds[count][1]/100.0
-                cmd_pub.publish(cmd)
+                speed_cmd.angular.z=-maxTheta*cmds[count][1]/100.0/2.8
+                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('s'):
                 # print "stop"
-                cmd_pub.publish(cmd)
+                                speed_cmd.linear.x = 0
+                                speed_cmd.angular.z = 0
+                                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('V'):
                 if cmds[count][1]==0:
                     # print "开启视觉"
@@ -133,13 +144,37 @@ def parseData(cmds):
                         #  print "关闭视觉2"
                          mapthread.stop()
                 elif cmds[count][1]==2:
+                    #  print "保存地图"
                      mapSaveFlag=Bool()
                      mapSaveFlag.data=True
                      mapSave_pub.publish(mapSaveFlag)
-                    #  print "保存地图"
-
+                     if scaleOrbThread!=None:
+                         scaleOrbThread.saveScale()
+            elif cmds[count][0]==ord('m'):
+                if cmds[count][1]==1:
+                    # print "开始低速巡检"
+                    if navthread.stopped():
+                        navthread.setspeed(1)
+                        navthread.start()
+                if cmds[count][1]==2:
+                    # print "开始中速巡检"
+                    if navthread.stopped():
+                        navthread.setspeed(2)
+                        navthread.start()
+                if cmds[count][1]==3:
+                    # print "开始高速巡检"
+                    if navthread.stopped():
+                        navthread.setspeed(3)
+                        navthread.start()
+                if cmds[count][1]==4:
+                    # print "关闭自主巡检"
+                    if not navthread.stopped():
+                        navthread.stop()
+                    speed_cmd.linear.x = 0
+                    speed_cmd.angular.z = 0
+                    cmd_pub.publish(speed_cmd)
         #only for debug
-        # print "recive orders"+str(cmds[count])
+        #print "recive orders"+str(cmds[count])
     return res
 
 class UserSer(threading.Thread):
@@ -187,6 +222,11 @@ class MapSer(threading.Thread):
         self.P=None
         self.psProcess=None
     def stop(self):
+        global scaleOrbThread
+        if scaleOrbThread !=None:
+            scaleOrbThread.stop()
+            scaleOrbThread =None
+
         if self.P!=None :
             # print str(self.P.pid)
             self.psProcess=psutil.Process(pid=self.P.pid)
@@ -202,13 +242,77 @@ class MapSer(threading.Thread):
         return self._stop.isSet()
 
     def run(self):
+        global scaleOrbThread
         self._stop.clear()
         cmd="roslaunch orb_slam2 map.launch"
+        new_env=os.environ.copy()
+        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():
 
             time.sleep(0.1)
             if self.P==None:
-                self.P=subprocess.Popen(cmd,shell=True)
+                self.P=subprocess.Popen(cmd,shell=True,env=new_env)
+                self.psProcess=psutil.Process(pid=self.P.pid)
+                # print str(self.P.pid)
+            else:
+                if self.psProcess.is_running():
+                    mStatusLock.acquire()
+                    mStatus.orbStartStatus = True
+                    mStatusLock.release()
+                    if scaleOrbThread ==None:
+                        scaleOrbThread = scaleOrb()
+                        scaleOrbThread.start()
+                else:
+                    if scaleOrbThread !=None:
+                        scaleOrbThread.stop()
+                        scaleOrbThread =None
+                    break
+            # status, output = commands.getstatusoutput('roslaunch orb_slam2 map.launch')
+        self.stop();
+
+class NavSer(threading.Thread):
+    #orb_slam建图线程
+    def __init__(self):
+        super(NavSer, self).__init__()
+        self._stop = threading.Event()
+        self._stop.set()
+        self.P=None
+        self.psProcess=None
+        self.speed=1;
+    def stop(self):
+        if self.P!=None :
+            # print str(self.P.pid)
+            self.psProcess=psutil.Process(pid=self.P.pid)
+            for child in self.psProcess.get_children(recursive=True):
+                # print str(child.pid)
+                child.kill()
+            self.psProcess.kill()
+        self.P=None
+        self._stop.set()
+        self.__init__()
+
+    def stopped(self):
+        return self._stop.isSet()
+
+    def setspeed(self,speed):
+        self.speed=speed
+
+    def run(self):
+        self._stop.clear()
+        if self.speed==1:
+            cmd="roslaunch nav_test  tank_blank_map1.launch"
+        elif self.speed==2:
+            cmd="roslaunch nav_test  tank_blank_map2.launch"
+        elif self.speed==3:
+            cmd="roslaunch nav_test  tank_blank_map3.launch"
+
+        new_env=os.environ.copy()
+        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
+        while not self.stopped() and not rospy.is_shutdown():
+
+            time.sleep(0.1)
+            if self.P==None:
+                self.P=subprocess.Popen(cmd,shell=True,env=new_env)
                 self.psProcess=psutil.Process(pid=self.P.pid)
                 # print str(self.P.pid)
             else:
@@ -220,6 +324,7 @@ class MapSer(threading.Thread):
                     break
             # status, output = commands.getstatusoutput('roslaunch orb_slam2 map.launch')
         self.stop();
+
 
 def getPower(power):
     mStatusLock.acquire()
@@ -240,7 +345,7 @@ def getOdom(odom):
     mStatusLock.acquire()
     if odom != None:
         mStatus.odomStatus = True
-        currentPose=odom.pose; #更新坐标
+        currentPose=odom.pose.pose; #更新坐标
 
     else:
         mStatus.odomStatus = False
@@ -267,11 +372,84 @@ def broadcast():
     rospy.init_node("broadcast", anonymous=True)
     rospy.Subscriber("/xqserial_server/Power", Float64, getPower)
     rospy.Subscriber("/usb_cam/image_raw", Image, getImage)
-    rospy.Subscriber("Odom_conbined", Odometry, getOdom)
+    rospy.Subscriber("/odom_combined", Odometry, getOdom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
     cmd_pub = rospy.Publisher('/cmd_vel', Twist , queue_size=0)
     mapSave_pub = rospy.Publisher('/map_save', Bool , queue_size=0)
+
+class scaleOrb(threading.Thread):
+
+    def __init__(self):
+        super(scaleOrb, self).__init__()
+        self._stop = threading.Event()
+        self.car_odoms = 0.0
+        self.cam_odoms = 0.0
+        self.car_lastPose = None
+        self.cam_lastPose = None
+        self.scale=5.
+        self.carPoseLock = threading.Lock()
+        self.camPoseLock = threading.Lock()
+        self.scaleLock = threading.Lock()
+        self.carbegin_flag=True
+        self.cambegin_flag=True
+    def stop(self):
+        global scaleOrbThread
+        self._stop.set()
+
+
+    def stopped(self):
+        return self._stop.isSet()
+
+    def run(self):
+        def updateCar(pose2d):
+            self.carPoseLock.acquire()
+            self.scaleLock.acquire()
+            if self.carbegin_flag:
+                self.car_lastPose = pose2d
+                self.carbegin_flag=False
+            self.car_odoms+=math.sqrt((pose2d.x-self.car_lastPose.x)*(pose2d.x-self.car_lastPose.x)+(pose2d.y-self.car_lastPose.y)*(pose2d.y-self.car_lastPose.y))
+            self.scaleLock.release()
+            self.car_lastPose = pose2d
+            self.carPoseLock.release()
+
+        def updateCam(pose):
+            self.camPoseLock.acquire()
+            self.scaleLock.acquire()
+            if self.cambegin_flag:
+                self.cam_lastPose = pose
+                self.cambegin_flag=False
+            self.cam_odoms+=math.sqrt((pose.position.x-self.cam_lastPose.position.x)*(pose.position.x-self.cam_lastPose.position.x)+(pose.position.z-self.cam_lastPose.position.z)*(pose.position.z-self.cam_lastPose.position.z))
+            self.scaleLock.release()
+            self.cam_lastPose= pose
+            self.camPoseLock.release()
+        while not mStatus.orbInitStatus and not rospy.is_shutdown():
+            time.sleep(0.5)
+        if rospy.is_shutdown():
+            self.stop()
+            return
+        carSub = rospy.Subscriber("/xqserial_server/Pose2D", Pose2D, updateCar)
+        camSub = rospy.Subscriber("/ORB_SLAM/Camera", Pose, updateCam)
+        while not self.stopped() and not rospy.is_shutdown():
+            time.sleep(1)
+        carSub.unregister()
+        camSub.unregister()
+        self.stop()
+
+    def saveScale(self):
+        self.scaleLock.acquire()
+        if self.cam_odoms>0.01:
+            self.scale=self.car_odoms/self.cam_odoms
+        else:
+            self.scale=5.0
+        fp3=open("/home/xiaoqiang/slamdb/scale.txt",'a+')
+        fp3.write(str(self.scale))#+" "+str(self.car_odoms)+" "+str(self.cam_odoms))
+        fp3.write('\n')
+        fp3.close
+        self.scaleLock.release()
+
+
+
 if __name__ == "__main__":
     broadcast()
     rate = rospy.Rate(10)
@@ -284,8 +462,19 @@ if __name__ == "__main__":
     UserSerThread = UserSer()
     UserSerThread.start()
     mapthread = MapSer()
+    navthread = NavSer()
     i=10
+    ii=20
     while not rospy.is_shutdown():
+        if not control_flag and ii>12 and  ii<17:
+            speed_cmd.linear.x = 0
+            speed_cmd.angular.z = 0
+            cmd_pub.publish(speed_cmd)
+        #每两秒心跳维护一次
+        if ii==20:
+            ii=0
+            control_flag=False
+        ii+=1
         #持续反馈状态
         if UserSocket_remote!=None and UserSerSocket!=None:
 
@@ -318,7 +507,10 @@ if __name__ == "__main__":
             i=0;
             data = "xq"
             #发送广播包
-            s.sendto(data, ('<broadcast>', MYPORT))
+            try:
+                s.sendto(data, ('<broadcast>', MYPORT))
+            except:
+                continue
             # clear data
             mStatus.power = 0.0
             mStatus.orbInitStatus = False
