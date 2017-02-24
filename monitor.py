@@ -12,6 +12,7 @@ from sensor_msgs.msg import Image
 from system_monitor.msg import *
 import threading
 import os
+import commands
 
 
 reportPub = ""
@@ -44,10 +45,11 @@ def getImage(image):
 def getPower(power):
     mStatusLock.acquire()
     mStatus.power = power.data
-    if power.data < powerLow and not os.path.isfile(powerFlagFilePath) and power.data > 0.1:
-        flagFile = open(powerFlagFilePath, "w+")
-        flagFile.write(str(power.data))
-        flagFile.close()
+    #if power.data < powerLow and power.data > 8.0: #and not os.path.isfile(powerFlagFilePath) 
+        #flagFile = open(powerFlagFilePath, "w+")
+        #flagFile.write(str(power.data))
+        #flagFile.close()
+        #status, output = commands.getstatusoutput('sudo shutdown -h now')
     mStatusLock.release()
 
 def getOdom(odom):
