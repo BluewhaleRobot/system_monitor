@@ -513,11 +513,11 @@ if __name__ == "__main__":
             else:
                 statu3=0x00
             if mStatus.orbGCFlag:
-                status4 = 0x0100 #ORB_SLAM 内存回收状态
+                status4 = 0x10 #ORB_SLAM 内存回收状态
             else:
                 status4 = 0
             if mStatus.orbGBAFlag:
-                status5 = 0x0200 #ORB_SLAM2 GBA状态，一般对应LoopClosing
+                status5 = 0x20 #ORB_SLAM2 GBA状态，一般对应LoopClosing
             else:
                 status5 = 0
             sendData[20] = statu0 + statu1 + statu2 + statu3 + status4 + status5
