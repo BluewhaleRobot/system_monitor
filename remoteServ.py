@@ -41,6 +41,8 @@ mStatus.orbStartStatus = False
 mStatus.orbInitStatus = False
 mStatus.power = 0.0
 mStatus.orbScaleStatus = False
+mStatus.orbGCFlag = False
+mStatus.orbGBAFlag = False
 powerLow = 10.0
 
 mStatusLock = threading.Lock()
@@ -367,6 +369,16 @@ def getOrbTrackingFlag(cam_pose):
         mStatus.orbInitStatus = False
     mStatusLock.release()
 
+def getOrbGCStatus(gc_flag):
+    mStatusLock.acquire()
+    mStatus.orbGCFlag = gc_flag.data
+    mStatusLock.release()
+
+def getOrbGBAStatus(gba_flag):
+    mStatusLock.acquire()
+    mStatus.orbGBAFlag = gba_flag.data
+    mStatusLock.release()
+
 def broadcast():
     global reportPub, cmd_pub,mapSave_pub
     rospy.init_node("broadcast", anonymous=True)
@@ -375,6 +387,8 @@ def broadcast():
     rospy.Subscriber("/odom_combined", Odometry, getOdom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
+    rospy.Subscriber("/ORB_SLAM/GC", Bool, getOrbGCStatus)
+    rospy.Subscriber("/ORB_SLAM/GBA", Bool, getOrbGBAStatus)
     cmd_pub = rospy.Publisher('/cmd_vel', Twist , queue_size=0)
     mapSave_pub = rospy.Publisher('/map_save', Bool , queue_size=0)
 
@@ -498,7 +512,15 @@ if __name__ == "__main__":
                 statu3=0x08 #视觉系统状态
             else:
                 statu3=0x00
-            sendData[20]=statu0+statu1+statu2+statu3
+            if mStatus.orbGCFlag:
+                status4 = 0x0100 #ORB_SLAM 内存回收状态
+            else:
+                status4 = 0
+            if mStatus.orbGBAFlag:
+                status5 = 0x0200 #ORB_SLAM2 GBA状态，一般对应LoopClosing
+            else:
+                status5 = 0
+            sendData[20] = statu0 + statu1 + statu2 + statu3 + status4 + status5
 
             UserSerSocket.sendto(bytes(sendData),UserSocket_remote)
 
@@ -517,6 +539,8 @@ if __name__ == "__main__":
             mStatus.orbStartStatus = False
             mStatus.imageStatus = False
             mStatus.odomStatus = False
+            mStatus.orbGCFlag = False
+            mStatus.orbGBAFlag = False
             # print "getyou4"
             # print str(sendData[20])
         i+=1;

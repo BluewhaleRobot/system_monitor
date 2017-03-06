@@ -45,7 +45,7 @@ def getImage(image):
 def getPower(power):
     mStatusLock.acquire()
     mStatus.power = power.data
-    if power.data < powerLow and power.data > 8.0: #and not os.path.isfile(powerFlagFilePath) 
+    if power.data < powerLow and power.data > 8.0: #and not os.path.isfile(powerFlagFilePath)
         #flagFile = open(powerFlagFilePath, "w+")
         #flagFile.write(str(power.data))
         #flagFile.close()
@@ -81,6 +81,15 @@ def getOrbScaleStatus(flag):
     mStatus.orbScaleStatus = flag.data
     mStatusLock.release()
 
+def getOrbGCStatus(gc_flag):
+    mStatusLock.acquire()
+    mStatus.orbGCFlag = gc_flag.data
+    mStatusLock.release()
+
+def getOrbGBAStatus(gba_flag):
+    mStatusLock.acquire()
+    mStatus.orbGBAFlag = gba_flag.data
+    mStatusLock.release()
 
 def monitor():
     global reportPub
@@ -92,6 +101,8 @@ def monitor():
     rospy.Subscriber("/xqserial_server/Odom", Odometry, getOdom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
     rospy.Subscriber("/orb_scale/scaleStatus", Bool, getOrbScaleStatus)
+    rospy.Subscriber("/ORB_SLAM/GC", Bool, getOrbGCStatus)
+    rospy.Subscriber("/ORB_SLAM/GBA", Bool, getOrbGBAStatus)
     reportPub = rospy.Publisher('/system_monitor/report', Status , queue_size
 =0)
 
@@ -112,5 +123,7 @@ if __name__ == "__main__":
         mStatus.orbInitStatus = False
         mStatus.orbStartStatus = False
         mStatus.orbScaleStatus = False
+        mStatus.orbGCFlag = False
+        mStatus.orbGBAFlag = False
         mStatusLock.release()
         rate.sleep()
