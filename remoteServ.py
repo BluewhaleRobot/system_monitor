@@ -2,7 +2,7 @@
 #coding:utf-8
 
 import rospy
-from std_msgs.msg import String, UInt32, Float64, Bool
+from std_msgs.msg import String, UInt32, Float64, Bool,Int16
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, Pose2D, Pose
 from sensor_msgs.msg import Image
@@ -18,6 +18,7 @@ import time,psutil,subprocess,signal
 import tf
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
+import numpy as  np
 
 HOST = ''#should not be 127.0.0.1 or localhost
 UserSocket_port=20001  #局域网udp命令监听端口
@@ -30,9 +31,9 @@ dataCache = []
 
 cmd_pub=None
 mapSave_pub=None
-
-maxVel=1.4
-maxTheta=7.2
+ 
+maxVel=0.8
+maxTheta=3.6
 mStatus = Status()
 mStatus.brightness = 0.0
 mStatus.imageStatus = False
@@ -49,7 +50,7 @@ mStatusLock = threading.Lock()
 
 dataCache = []
 currentPose=Pose();
-sendData=bytearray([205,235,215,20,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
+sendData=bytearray([205,235,215,24,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
 speed_cmd=Twist()
 
 mapthread=None
@@ -57,7 +58,14 @@ navthread=None
 control_flag=False
 
 scaleOrbThread=None
+globalMovePub=None
+elevatorPub=None
 
+tf_rot=np.array([[ 0., 0.06603153, 0.99781754],[ -1., 0.,0.], [0., -0.99781754, 0.06603153]])
+tf_trans=np.array([0.0,0.0,0.])
+navFlag=False
+tilt_pub=None
+nav_lastTime=None
 def getDataFromReq(req):
     pass
 
@@ -102,79 +110,127 @@ def splitReq(req):
 
 def parseData(cmds):
     global cmd_pub, maxVel, maxTheta,mapthread,speed_cmd,control_flag
-    global scaleOrbThread
+    global scaleOrbThread,globalMovePub,elevatorPub
+    global navFlag,tilt_pub,mapSave_pub,nav_lastTime
     res = None
+    time_now=rospy.Time.now()
     for count in range(0, len(cmds)):
         if len(cmds[count])>0:
             control_flag=True
         #判断是否为关机命令
         if len(cmds[count])==2:
+            globalMoveFlag=Bool()
+            globalMoveFlag.data=True
+
             if cmds[count][0]==0xaa and cmds[count][1]==0x44:
                 print "system poweroff"
                 status, output = commands.getstatusoutput('sudo shutdown -h now')
 
             if cmds[count][0]==ord('f'):
-                # print "forward"
+                print "forward"
+                globalMovePub.publish(globalMoveFlag)
                 speed_cmd.linear.x=maxVel*cmds[count][1]/100.0
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('b'):
-                # print "back"
+                print "back"
+                globalMovePub.publish(globalMoveFlag)
                 speed_cmd.linear.x=-maxVel*cmds[count][1]/100.0
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('c'):
-                # print "circleleft"
+                print "circleleft"
+                globalMovePub.publish(globalMoveFlag)
                 speed_cmd.angular.z=maxTheta*cmds[count][1]/100.0/2.8
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('d'):
-                # print "circleright"
+                print "circleright"
+                globalMovePub.publish(globalMoveFlag)
                 speed_cmd.angular.z=-maxTheta*cmds[count][1]/100.0/2.8
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('s'):
-                # print "stop"
-                                speed_cmd.linear.x = 0
-                                speed_cmd.angular.z = 0
-                                cmd_pub.publish(speed_cmd)
+                print "stop"
+                speed_cmd.linear.x = 0
+                speed_cmd.angular.z = 0
+                cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('V'):
                 if cmds[count][1]==0:
-                    # print "开启视觉"
+                    print "开启视觉"
                     if mapthread.stopped():
-                        # print "开启视觉2"
+                        print "开启视觉2"
                         mapthread.start()
                 elif cmds[count][1]==1:
-                    #  print "关闭视觉"
+                     print "关闭视觉"
                      if not mapthread.stopped():
-                        #  print "关闭视觉2"
+                         print "关闭视觉2"
                          mapthread.stop()
+                     os.system("pkill -f odom_combined.py")
+                     os.system("pkill -f navGuide.py")
+                     os.system("pkill -f mono")
+                     os.system("pkill -f map_server")
+                     os.system("pkill -f move_base")
+                     os.system("pkill -f odom_map_broadcaster")
                 elif cmds[count][1]==2:
-                    #  print "保存地图"
+                     print "保存地图"
                      mapSaveFlag=Bool()
                      mapSaveFlag.data=True
                      mapSave_pub.publish(mapSaveFlag)
                      if scaleOrbThread!=None:
                          scaleOrbThread.saveScale()
+            elif cmds[count][0]==ord('h'):
+                elePose=UInt32()
+                elePose.data=cmds[count][1]
+                elevatorPub.publish(elePose)
             elif cmds[count][0]==ord('m'):
+                time1_diff=time_now-nav_lastTime
                 if cmds[count][1]==1:
-                    # print "开始低速巡检"
+                    if time1_diff.to_sec()<30:
+                        continue
+                    print "开始低速巡检"
+                    nav_lastTime=time1_diff
+                    tilt_degree=Int16()
+                    tilt_degree.data=-19
+                    tilt_pub.publish(tilt_degree)
                     if navthread.stopped():
                         navthread.setspeed(1)
                         navthread.start()
                 if cmds[count][1]==2:
-                    # print "开始中速巡检"
+                    if time1_diff.to_sec()<30:
+                        continue
+                    print "开始中速巡检"
+                    nav_lastTime=time1_diff
+                    tilt_degree=Int16()
+                    tilt_degree.data=-19
+                    tilt_pub.publish(tilt_degree)
                     if navthread.stopped():
                         navthread.setspeed(2)
                         navthread.start()
                 if cmds[count][1]==3:
-                    # print "开始高速巡检"
+                    if time1_diff.to_sec()<30:
+                        continue
+                    print "开始高速巡检"
+                    nav_lastTime=time1_diff
+                    tilt_degree=Int16()
+                    tilt_degree.data=-19
+                    tilt_pub.publish(tilt_degree)
                     if navthread.stopped():
                         navthread.setspeed(3)
                         navthread.start()
                 if cmds[count][1]==4:
-                    # print "关闭自主巡检"
+                    print "关闭自主巡检"
+                    tilt_degree=Int16()
+                    tilt_degree.data=0
+                    tilt_pub.publish(tilt_degree)
                     if not navthread.stopped():
                         navthread.stop()
                     speed_cmd.linear.x = 0
                     speed_cmd.angular.z = 0
                     cmd_pub.publish(speed_cmd)
+                    navFlag=False
+                    os.system("pkill -f odom_combined.py")
+                    os.system("pkill -f navGuide.py")
+                    os.system("pkill -f mono")
+                    os.system("pkill -f map_server")
+                    os.system("pkill -f move_base")
+                    os.system("pkill -f odom_map_broadcaster")
         #only for debug
         #print "recive orders"+str(cmds[count])
     return res
@@ -250,9 +306,7 @@ class MapSer(threading.Thread):
         new_env=os.environ.copy()
         new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():
-
-            time.sleep(0.1)
-            if self.P==None:
+            if self.P==None and not self.stopped():
                 self.P=subprocess.Popen(cmd,shell=True,env=new_env)
                 self.psProcess=psutil.Process(pid=self.P.pid)
                 # print str(self.P.pid)
@@ -269,6 +323,7 @@ class MapSer(threading.Thread):
                         scaleOrbThread.stop()
                         scaleOrbThread =None
                     break
+            time.sleep(0.1)
             # status, output = commands.getstatusoutput('roslaunch orb_slam2 map.launch')
         self.stop();
 
@@ -311,9 +366,7 @@ class NavSer(threading.Thread):
         new_env=os.environ.copy()
         new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():
-
-            time.sleep(0.1)
-            if self.P==None:
+            if self.P==None and not self.stopped():
                 self.P=subprocess.Popen(cmd,shell=True,env=new_env)
                 self.psProcess=psutil.Process(pid=self.P.pid)
                 # print str(self.P.pid)
@@ -324,6 +377,7 @@ class NavSer(threading.Thread):
                     mStatusLock.release()
                 else:
                     break
+            time.sleep(0.1)
             # status, output = commands.getstatusoutput('roslaunch orb_slam2 map.launch')
         self.stop();
 
@@ -369,6 +423,20 @@ def getOrbTrackingFlag(cam_pose):
         mStatus.orbInitStatus = False
     mStatusLock.release()
 
+def getglobalMoveFlag(moveEn):
+    global navthread
+    if not moveEn.data:
+        #关闭视觉导航
+        if not navthread.stopped():
+            navthread.stop()
+
+def getNavFlag(navRun):
+    global navFlag,navthread
+    if navRun.data and not navthread.stopped():
+        navFlag=True
+    else:
+        navFlag=False
+
 def getOrbGCStatus(gc_flag):
     mStatusLock.acquire()
     mStatus.orbGCFlag = gc_flag.data
@@ -380,8 +448,9 @@ def getOrbGBAStatus(gba_flag):
     mStatusLock.release()
 
 def broadcast():
-    global reportPub, cmd_pub,mapSave_pub
+    global reportPub, cmd_pub,mapSave_pub,globalMovePub,elevatorPub,tilt_pub,nav_lastTime
     rospy.init_node("broadcast", anonymous=True)
+    nav_lastTime=rospy.Time.now()
     rospy.Subscriber("/xqserial_server/Power", Float64, getPower)
     rospy.Subscriber("/usb_cam/image_raw", Image, getImage)
     rospy.Subscriber("/odom_combined", Odometry, getOdom)
@@ -389,8 +458,14 @@ def broadcast():
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
     rospy.Subscriber("/ORB_SLAM/GC", Bool, getOrbGCStatus)
     rospy.Subscriber("/ORB_SLAM/GBA", Bool, getOrbGBAStatus)
+    rospy.Subscriber("/globalMoveFlag", Bool, getglobalMoveFlag)
+    rospy.Subscriber('/nav_setStop', Bool, getNavFlag)
+    globalMovePub = rospy.Publisher('/globalMoveFlag', Bool , queue_size=1)
+    elevatorPub = rospy.Publisher('/elevatorPose', UInt32 , queue_size=1)
     cmd_pub = rospy.Publisher('/cmd_vel', Twist , queue_size=0)
     mapSave_pub = rospy.Publisher('/map_save', Bool , queue_size=0)
+    tilt_pub = rospy.Publisher('/set_tilt_degree', Int16 , queue_size=0)
+
 
 class scaleOrb(threading.Thread):
 
@@ -401,7 +476,7 @@ class scaleOrb(threading.Thread):
         self.cam_odoms = 0.0
         self.car_lastPose = None
         self.cam_lastPose = None
-        self.scale=5.
+        self.scale=1.
         self.carPoseLock = threading.Lock()
         self.camPoseLock = threading.Lock()
         self.scaleLock = threading.Lock()
@@ -455,7 +530,7 @@ class scaleOrb(threading.Thread):
         if self.cam_odoms>0.01:
             self.scale=self.car_odoms/self.cam_odoms
         else:
-            self.scale=5.0
+            self.scale=1.0
         fp3=open("/home/xiaoqiang/slamdb/scale.txt",'a+')
         fp3.write(str(self.scale))#+" "+str(self.car_odoms)+" "+str(self.cam_odoms))
         fp3.write('\n')
@@ -478,25 +553,48 @@ if __name__ == "__main__":
     mapthread = MapSer()
     navthread = NavSer()
     i=10
-    ii=20
+    ii=40
+    cmd4="aplay /home/xiaoqiang/Desktop/d.wav"
     while not rospy.is_shutdown():
-        if not control_flag and ii>12 and  ii<17:
-            speed_cmd.linear.x = 0
-            speed_cmd.angular.z = 0
-            cmd_pub.publish(speed_cmd)
-        #每两秒心跳维护一次
-        if ii==20:
+        # #每２秒提示一下
+        # if ii==10:
+        #     subprocess.Popen(cmd4,shell=True)
+
+        # if not control_flag and ii>32 and  ii<37:
+        #     speed_cmd.linear.x = 0
+        #     speed_cmd.angular.z = 0
+        #     cmd_pub.publish(speed_cmd)
+        #每4秒心跳维护一次
+        if ii==40:
             ii=0
             control_flag=False
         ii+=1
         #持续反馈状态
         if UserSocket_remote!=None and UserSerSocket!=None:
 
-            sendData[4:8]=map(ord,struct.pack('f',currentPose.position.x))
-            sendData[8:12]=map(ord,struct.pack('f',currentPose.position.y))
-            sendData[12:16]=map(ord,struct.pack('f',currentPose.position.z))
+            Tbc=np.array([currentPose.position.x,currentPose.position.y,currentPose.position.z])
+            q=[currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w]
+            M=tf.transformations.quaternion_matrix(q)
+            Rbc=M[:3,:3]
+
+            ax,ay,theta_send=tf.transformations.euler_from_matrix(Rbc)
+            #为了简化计算，下文的计算中base_link 和base_footprint被看成是相同的坐标系
+            Rbd=Rbc.dot(tf_rot)
+            Tbd=Rbc.dot(tf_trans)+Tbc
+
+            Rab=tf_rot.T
+            Tab=-Rab.dot(tf_trans)
+
+            Rad=Rab.dot(Rbd)
+            Tad=Rab.dot(Tbd)+Tab
+
+
+            sendData[4:8]=map(ord,struct.pack('f',Tad[0]))
+            sendData[8:12]=map(ord,struct.pack('f',Tad[1]))
+            sendData[12:16]=map(ord,struct.pack('f',Tad[2]))
             sendData[16:20]=map(ord,struct.pack('f',mStatus.power))
-            if mStatus.odomStatus :
+            sendData[24:28]=map(ord,struct.pack('f',theta_send))
+            if mStatus.odomStatus or navFlag or not navthread.stopped():
                 statu0=0x01 #混合里程计
             else:
                 statu0=0x00
@@ -522,7 +620,10 @@ if __name__ == "__main__":
                 status5 = 0
             sendData[20] = statu0 + statu1 + statu2 + statu3 + status4 + status5
 
-            UserSerSocket.sendto(bytes(sendData),UserSocket_remote)
+            try:
+                UserSerSocket.sendto(bytes(sendData),UserSocket_remote)
+            except:
+                print "remote disconnect !\n"
 
         #每秒广播一次
         if i==10:
