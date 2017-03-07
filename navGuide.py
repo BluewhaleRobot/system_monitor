@@ -13,20 +13,26 @@ from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
 from math import radians, pi
 import numpy as  np
-import time
+import time,psutil,subprocess,signal
 import threading
 import math
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
+from std_msgs.msg import Int32,Bool
 
 scale = 1.
-tf_rot=np.array([[0.,0.,1.],[-1.,0.,0.],[0.,-1.,0.]])
-tf_trans=np.array([0.4,0.0,0.])
+tf_rot=np.array([[ 0., 0.55176688, 0.83399839],[ -1., 0.,0.], [0., -0.83399839, 0.55176688]])
+tf_trans=np.array([0.0,0.0,0.])
 
 NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
 currentPose=Pose();
 mStatusLock = threading.Lock()
 poseFlag=False
+
+playFlag=False
+playStartTime=None
+playFlagTime=None
+status=1
 
 def getOdom(odom):
     global currentPose,poseFlag
@@ -38,6 +44,38 @@ def getOdom(odom):
         poseFlag=False
     mStatusLock.release()
 
+def dealCarStatus(carStatu):
+    global playFlag,playStartTime,playFlagTime,status
+
+    cmd1="aplay /home/xiaoqiang/Desktop/speaker.wav"
+    cmd2="aplay /home/xiaoqiang/Desktop/engine.wav"
+    status=carStatu.data
+    time_now=rospy.Time.now()
+
+    if status!=2 or playFlagTime ==None:
+        playFlagTime=time_now
+
+    if playFlag:
+        time_diff=time_now-playStartTime
+        if time_diff.to_sec()>8.0:
+            playFlag=False
+
+    else:
+        if status==2:
+            time_diff=time_now-playFlagTime
+            if time_diff.to_sec()>2.0 and time_diff.to_sec()<5.0:
+                #play speaker
+                subprocess.Popen(cmd1,shell=True)
+                playStartTime=time_now
+                playFlag=True
+            elif time_diff.to_sec()>12.0 and time_diff.to_sec()<15.0:
+                #play engine
+                subprocess.Popen(cmd2,shell=True)
+                playStartTime=time_now
+                playFlag=True
+            elif time_diff.to_sec()>22.0:
+                playFlagTime=time_now
+
 class MoveBaseSquare:
 
     def __init__(self):
@@ -48,7 +86,7 @@ class MoveBaseSquare:
         rospy.on_shutdown(self.shutdown)
 
         odomSub=rospy.Subscriber("/odom_combined", Odometry, getOdom)
-
+        carStatuSub=rospy.Subscriber("/xqserial_server/StatusFlag", Int32, dealCarStatus)
         self.move_base=None
 
         navDataFile = open(NAV_POINTS_FILE, "r")
@@ -57,7 +95,8 @@ class MoveBaseSquare:
         while len(navDataStr) != 0:
             posX = float(navDataStr.split(" ")[0])
             posY = float(navDataStr.split(" ")[1])
-            targetPoints.append([posX, posY])
+            posZ = float(navDataStr.split(" ")[2])
+            targetPoints.append([posX, posY, posZ])
             navDataStr = navDataFile.readline()
 
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
@@ -101,7 +140,7 @@ class MoveBaseSquare:
             # Rbc=Rbd.dot(Rdc)
             # Tbc=scale*(Rbd.dot(Tdc))+Tbd
 
-            Tad=np.array([point[0],0.0, point[1]])
+            Tad=np.array([point[0],point[1], point[2]])
             Tbc=scale*(tf_rot.dot(Tad))
             waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
         # Initialize the visualization markers for RViz
@@ -127,19 +166,65 @@ class MoveBaseSquare:
         q2=[currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w]
         euler2=euler_from_quaternion(q2)
         theta_current=euler2[2]
-        for waypoint in waypoints:
-            p = Point()
-            p = waypoint.position
-            self.markers.points.append(p)
-            curentdist=(p.x - currentPose.position.x)*(p.x - currentPose.position.x)+(p.y - currentPose.position.y)*(p.y - currentPose.position.y)
-            theta_delta=math.atan2(p.y - currentPose.position.y,p.x - currentPose.position.x)
-            if theta_delta < 0.:
-               theta_delta+=2*3.1415926
+        # if theta_current < 0.:
+        #    theta_current+=2*3.1415926
+        # print "theta_current "+str(theta_current)
+        #delta_last=0.;
+        #delta_current=0.;
+        upDirt=True
+        if max_index>0:
+            for waypoint in waypoints:
+                p = Point()
+                p = waypoint.position
+                self.markers.points.append(p)
+                curentdist=(p.x - currentPose.position.x)*(p.x - currentPose.position.x)+(p.y - currentPose.position.y)*(p.y - currentPose.position.y)
+                theta_delta=math.atan2(p.y - currentPose.position.y,p.x - currentPose.position.x)
 
-            if mindist<0. or (curentdist<mindist and abs(theta_delta-theta_current)<1.6):
-                mindist_index=i
-                mindist=curentdist
-            i=i+1
+                # if theta_delta < 0.:
+                #    theta_delta+=2*3.1415926
+                # print "theta_delta "+str(theta_delta)
+                delta_current=abs(theta_delta-theta_current)
+                if delta_current>3.1415926:
+                    delta_current=abs(2*3.1415926-delta_current)
+
+                # print "delta_current"+str(delta_current)
+                if delta_current<1.6 and (mindist<0. or curentdist<mindist ):
+                    mindist_index=i
+                    mindist=curentdist
+                    delta_last=delta_current
+                    # print "i:"+str(i)
+                    if i<max_index:
+                        p2=waypoints[i+1].position
+                    else:
+                        p2=waypoints[0].position
+
+                    if i>0:
+                        p0=waypoints[i-1].position
+                    else:
+                        p0=waypoints[max_index].position
+                    if max_index>1:
+                        theta_next=math.atan2(p2.y - p.y,p2.x - p.x)
+                        theta_last=math.atan2(p0.y - p.y,p0.x - p.x)
+                        # if theta_next < 0.:
+                        #    theta_next+=2*3.1415926
+                        # if theta_last < 0.:
+                        #    theta_last+=2*3.1415926
+                        delta_next0=abs(theta_next-theta_delta)
+                        delta_last0=abs(theta_last-theta_delta)
+                        if delta_next0>3.1415926:
+                            delta_next0=2*3.1415926-delta_next0
+                        if delta_last0>3.1415926:
+                            delta_last0=2*3.1415926-delta_last0
+                        # print "theta_next "+str(theta_next)
+                        # print "theta_last "+str(theta_last)
+                        if abs(delta_next0)<abs(delta_last0):
+                            upDirt=True
+                        else:
+                            upDirt=False
+                i=i+1
+        # print "updirt:"+str(upDirt)
+        # while not rospy.is_shutdown():
+        #     time.sleep(1)
 
         # Publisher to manually control the robot (e.g. to stop it)
         # 发布TWist消息控制机器人
@@ -161,93 +246,175 @@ class MoveBaseSquare:
 
 
         while not rospy.is_shutdown():
-            # Initialize a counter to track waypoints
-            # 初始化一个计数器，记录到达的顶点号
-            i = mindist_index
-            # Cycle through the four waypoints
-            # 主循环,环绕通过四个定点
-            while i >=0 and not rospy.is_shutdown():
-                print i
-                # Update the marker display
-                # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
-                # while not rospy.is_shutdown():
-                #     time.sleep(1)
-                #     self.marker_pub.publish(self.markers)
-                #
-                self.marker_pub.publish(self.markers)
 
-                # Intialize the waypoint goal
-                # 初始化goal为MoveBaseGoal类型
-                goal = MoveBaseGoal()
+            if upDirt:
+                # Initialize a counter to track waypoints
+                # 初始化一个计数器，记录到达的顶点号
+                i = mindist_index
+                # Cycle through the four waypoints
+                # 主循环,环绕通过四个定点
+                while i <=max_index and not rospy.is_shutdown():
+                    print i
+                    # Update the marker display
+                    # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
+                    # while not rospy.is_shutdown():
+                    #     time.sleep(1)
+                    #     self.marker_pub.publish(self.markers)
+                    #
+                    self.marker_pub.publish(self.markers)
 
-                # Use the map frame to define goal poses
-                # 使用map的frame定义goal的frame id
-                goal.target_pose.header.frame_id = 'map'
+                    # Intialize the waypoint goal
+                    # 初始化goal为MoveBaseGoal类型
+                    goal = MoveBaseGoal()
 
-                # Set the time stamp to "now"
-                # 设置时间戳
-                goal.target_pose.header.stamp = rospy.Time.now()
+                    # Use the map frame to define goal poses
+                    # 使用map的frame定义goal的frame id
+                    goal.target_pose.header.frame_id = 'map'
 
-                # Set the goal pose to the i-th waypoint
-                # 设置目标位置是当前第几个导航点
-                goal.target_pose.pose = waypoints[i]
+                    # Set the time stamp to "now"
+                    # 设置时间戳
+                    goal.target_pose.header.stamp = rospy.Time.now()
 
-                # Start the robot moving toward the goal
-                # 机器人移动
-                self.move(goal)
+                    # Set the goal pose to the i-th waypoint
+                    # 设置目标位置是当前第几个导航点
+                    goal.target_pose.pose = waypoints[i]
 
-                i -= 1
+                    # Start the robot moving toward the goal
+                    # 机器人移动
+                    self.move(goal)
 
-            i = max_index
-            # Cycle through the four waypoints
-            # 主循环,环绕通过四个定点
-            while i > mindist_index and not rospy.is_shutdown():
-                print i
-                # Update the marker display
-                # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
-                # while not rospy.is_shutdown():
-                #     time.sleep(1)
-                #     self.marker_pub.publish(self.markers)
-                #
-                self.marker_pub.publish(self.markers)
+                    i += 1
+                    time.sleep(3)
 
-                # Intialize the waypoint goal
-                # 初始化goal为MoveBaseGoal类型
-                goal = MoveBaseGoal()
+                i = 0
+                # Cycle through the four waypoints
+                # 主循环,环绕通过四个定点
+                while i < mindist_index and not rospy.is_shutdown():
+                    print i
+                    # Update the marker display
+                    # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
+                    # while not rospy.is_shutdown():
+                    #     time.sleep(1)
+                    #     self.marker_pub.publish(self.markers)
+                    #
+                    self.marker_pub.publish(self.markers)
 
-                # Use the map frame to define goal poses
-                # 使用map的frame定义goal的frame id
-                goal.target_pose.header.frame_id = 'map'
+                    # Intialize the waypoint goal
+                    # 初始化goal为MoveBaseGoal类型
+                    goal = MoveBaseGoal()
 
-                # Set the time stamp to "now"
-                # 设置时间戳
-                goal.target_pose.header.stamp = rospy.Time.now()
+                    # Use the map frame to define goal poses
+                    # 使用map的frame定义goal的frame id
+                    goal.target_pose.header.frame_id = 'map'
 
-                # Set the goal pose to the i-th waypoint
-                # 设置目标位置是当前第几个导航点
-                goal.target_pose.pose = waypoints[i]
+                    # Set the time stamp to "now"
+                    # 设置时间戳
+                    goal.target_pose.header.stamp = rospy.Time.now()
 
-                # Start the robot moving toward the goal
-                # 机器人移动
-                self.move(goal)
+                    # Set the goal pose to the i-th waypoint
+                    # 设置目标位置是当前第几个导航点
+                    goal.target_pose.pose = waypoints[i]
 
-                i -= 1
+                    # Start the robot moving toward the goal
+                    # 机器人移动
+                    self.move(goal)
+
+                    i += 1
+                    time.sleep(3)
+            else:
+                # Initialize a counter to track waypoints
+                # 初始化一个计数器，记录到达的顶点号
+                i = mindist_index
+                # Cycle through the four waypoints
+                # 主循环,环绕通过四个定点
+                while i >=0 and not rospy.is_shutdown():
+                    print i
+                    # Update the marker display
+                    # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
+                    # while not rospy.is_shutdown():
+                    #     time.sleep(1)
+                    #     self.marker_pub.publish(self.markers)
+                    #
+                    self.marker_pub.publish(self.markers)
+
+                    # Intialize the waypoint goal
+                    # 初始化goal为MoveBaseGoal类型
+                    goal = MoveBaseGoal()
+
+                    # Use the map frame to define goal poses
+                    # 使用map的frame定义goal的frame id
+                    goal.target_pose.header.frame_id = 'map'
+
+                    # Set the time stamp to "now"
+                    # 设置时间戳
+                    goal.target_pose.header.stamp = rospy.Time.now()
+
+                    # Set the goal pose to the i-th waypoint
+                    # 设置目标位置是当前第几个导航点
+                    goal.target_pose.pose = waypoints[i]
+
+                    # Start the robot moving toward the goal
+                    # 机器人移动
+                    self.move(goal)
+
+                    i -= 1
+                    time.sleep(3)
+                i = max_index
+                # Cycle through the four waypoints
+                # 主循环,环绕通过四个定点
+                while i > mindist_index and not rospy.is_shutdown():
+                    print i
+                    # Update the marker display
+                    # 发布标记指示四个目标的位置，每个周期发布一起，确保标记可见
+                    # while not rospy.is_shutdown():
+                    #     time.sleep(1)
+                    #     self.marker_pub.publish(self.markers)
+                    #
+                    self.marker_pub.publish(self.markers)
+
+                    # Intialize the waypoint goal
+                    # 初始化goal为MoveBaseGoal类型
+                    goal = MoveBaseGoal()
+
+                    # Use the map frame to define goal poses
+                    # 使用map的frame定义goal的frame id
+                    goal.target_pose.header.frame_id = 'map'
+
+                    # Set the time stamp to "now"
+                    # 设置时间戳
+                    goal.target_pose.header.stamp = rospy.Time.now()
+
+                    # Set the goal pose to the i-th waypoint
+                    # 设置目标位置是当前第几个导航点
+                    goal.target_pose.pose = waypoints[i]
+
+                    # Start the robot moving toward the goal
+                    # 机器人移动
+                    self.move(goal)
+
+                    i -= 1
+                    time.sleep(3)
 
 
     def move(self, goal):
+            global status
             # Send the goal pose to the MoveBaseAction server
             # 把目标位置发送给MoveBaseAction的服务器
             self.move_base.send_goal(goal)
 
             # Allow 1 minute to get there
             # 设定1分钟的时间限制
-            finished_within_time = self.move_base.wait_for_result(rospy.Duration(240))
+            finished_within_time = self.move_base.wait_for_result(rospy.Duration(480))
 
             # If we don't get there in time, abort the goal
             # 如果一分钟之内没有到达，放弃目标
             if not finished_within_time:
                 self.move_base.cancel_goal()
-                rospy.loginfo("Timed out achieving goal")
+                if status==2:
+                    rospy.loginfo("Timed out achieving goal,bar dectected ,try again")
+                    self.move(goal)
+                else:
+                    rospy.loginfo("Timed out achieving goal")
             else:
                 # We made it!
                 state = self.move_base.get_state()

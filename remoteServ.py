@@ -31,7 +31,7 @@ dataCache = []
 
 cmd_pub=None
 mapSave_pub=None
- 
+
 maxVel=0.8
 maxTheta=3.6
 mStatus = Status()
@@ -261,6 +261,7 @@ class UserSer(threading.Thread):
                 data, UserSocket_remote = UserSerSocket.recvfrom(BUFSIZE)
             except timeout:
                 # print "timeout"
+                UserSocket_remote=None
                 continue
             #print "UserSocket get data"
             if not data: break
