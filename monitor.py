@@ -44,8 +44,8 @@ def getImage(image):
 
 def getPower(power):
     mStatusLock.acquire()
-    mStatus.power = power.data
-    #if power.data < powerLow and power.data > 8.0: #and not os.path.isfile(powerFlagFilePath) 
+    mStatus.power = power.data-0.3
+    #if power.data < powerLow and power.data > 8.0: #and not os.path.isfile(powerFlagFilePath)
         #flagFile = open(powerFlagFilePath, "w+")
         #flagFile.write(str(power.data))
         #flagFile.close()
