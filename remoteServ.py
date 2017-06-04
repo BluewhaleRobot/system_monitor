@@ -32,8 +32,8 @@ dataCache = []
 cmd_pub=None
 mapSave_pub=None
 
-maxVel=0.8
-maxTheta=3.6
+maxVel=1.2
+maxTheta=7.2
 mStatus = Status()
 mStatus.brightness = 0.0
 mStatus.imageStatus = False
