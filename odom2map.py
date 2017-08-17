@@ -26,23 +26,19 @@ orbStartFlag =False
 mStatusLock = threading.Lock()
 
 velPub = None
-OdomPub = None
 ClearPub = None
 transform = None
 lisener=None
-odom_combined_tf=None
-odom_combined_tf2=None
+odom2map_tf=None
+odom2map_tf2=None
 scale = 0.
 prviousCamPose = None
 prviousstamp = None
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
 tf_trans=np.array([0.0,0.0,0.])
-hf_rot=np.array([[ 1., 0.0, 0.0],[ 0., 1.,0.], [0., 0., 1.]])
-hf_trans=np.array([0.0,0.0,0.])
+Mhf=np.identity(4)
 
-Odom_last = Odometry()
-Odom_last.header.frame_id = "odom_combined"
-Odom_last.child_frame_id = "base_footprint"
+
 begin_flag=True
 globalMovePub=None
 
@@ -61,10 +57,6 @@ navFlag_pub=None
 enableMoveFlag=True
 # try to get track again when losing track
 
-Reo=None
-Teo=None
-Rgo=None
-Tgo=None
 
 import threading
 
@@ -123,7 +115,6 @@ def carOdom(odom):
     mStatusLock.acquire()
     carUpdateFlag=True
     car_currentPose=odom.pose.pose
-    car_currentPose.position.z=odom.twist.twist.linear.x
     car_currentTime=rospy.Time.now()
     if begin_flag:
         car_lastPose=car_currentPose
@@ -141,16 +132,16 @@ def cameraOdom(campose):
     mStatusLock.release()
 
 
-def doOdomPub():
+def doTfPub():
     global camUpdateFlag,carUpdateFlag,mStatusLock
     global cam_currentPose,cam_currentTime
     global car_currentPose,car_currentTime
-    global car_lastPose,cam_lastPose,Odom_last
-    global begin_flag,scale,OdomPub,globalMovePub,velPub
-    global hf_rot,hf_trans,tf_rot,tf_trans,scale
-    global odom_combined_tf,odom_combined_tf2
+    global car_lastPose,cam_lastPose
+    global begin_flag,scale,globalMovePub,velPub
+    global Mhf,tf_rot,tf_trans,scale
+    global odom2map_tf,odom2map_tf2
     global navFlag_pub,ClearPub,enableMoveFlag
-    global Reo,Teo,Rgo,Tgo
+
     time_now=rospy.Time.now()
 
     Odom = Odometry()
@@ -167,7 +158,11 @@ def doOdomPub():
     if begin_flag:
         cam_lastPose=cam_currentPose
         car_lastPose=car_currentPose
-    if camUpdateFlag:
+
+    time0_diff=cam_currentTime-car_currentTime
+
+    if camUpdateFlag and abs(time0_diff.to_sec())<0.05 :
+
         Tad=np.array([cam_currentPose.position.x,cam_currentPose.position.y,cam_currentPose.position.z])
         q=[cam_currentPose.orientation.x,cam_currentPose.orientation.y,cam_currentPose.orientation.z,cam_currentPose.orientation.w]
         M=tf.transformations.quaternion_matrix(q)
@@ -181,98 +176,67 @@ def doOdomPub():
         Tdc=-1/scale*(Rdc.dot(tf_trans))
         Rbc=Rbd.dot(Rdc)
         Tbc=scale*(Rbd.dot(Tdc))+Tbd
+        Tbc[2]=0.0
 
-        Odom.pose.pose.position.x =Tbc[0]
-        Odom.pose.pose.position.y =Tbc[1]
-        Odom.pose.pose.position.z =0. #Tbc[2]
-        M=np.identity(4)
-        M[:3,:3]=Rbc
-        q=tf.transformations.quaternion_from_matrix(M)
-        Odom.pose.pose.orientation.x = q[0]
-        Odom.pose.pose.orientation.y = q[1]
-        Odom.pose.pose.orientation.z = q[2]
-        Odom.pose.pose.orientation.w = q[3]
-        cam_lastPose=cam_currentPose
-    else:
-        if carUpdateFlag:
+        Mho=np.identity(4)
+        Mho[:3,:3]=Rbc
+        Mho[:3,3]=Tbc
 
-            q=[Odom_last.pose.pose.orientation.x,Odom_last.pose.pose.orientation.y,Odom_last.pose.pose.orientation.z,Odom_last.pose.pose.orientation.w]
-            euler=euler_from_quaternion(q)
-            theta_last=euler[2]
+        Mof=np.identity(4)
+        q=[car_currentPose.orientation.x,car_currentPose.orientation.y,car_currentPose.orientation.z,car_currentPose.orientation.w]
+        M=tf.transformations.quaternion_matrix(q)
+        Rfo=M[:3,:3]
+        Tfo=np.array([car_currentPose.position.x,car_currentPose.position.y,car_currentPose.position.z])
+        Mof[:3,:3]=Rfo.T
+        Mof[:3,3]=-Rfo.T.dot(Tfo)
 
-            delta_car=math.sqrt((car_currentPose.position.x-car_lastPose.position.x)*(car_currentPose.position.x-car_lastPose.position.x)+(car_currentPose.position.y-car_lastPose.position.y)*(car_currentPose.position.y-car_lastPose.position.y))
-            if car_currentPose.position.z<0.000001:
-                delta_car=-1.*delta_car
-            Odom.pose.pose.position.x =Odom_last.pose.pose.position.x+delta_car*math.cos(theta_last)
-            Odom.pose.pose.position.y =Odom_last.pose.pose.position.y+delta_car*math.sin(theta_last)
-            Odom.pose.pose.position.z =0.
+        Mhf=Mho.dot(Mof)
 
+        if begin_flag:
+            begin_flag=False
 
-            q1=[car_lastPose.orientation.x,car_lastPose.orientation.y,car_lastPose.orientation.z,car_lastPose.orientation.w]
-            q2=[car_currentPose.orientation.x,car_currentPose.orientation.y,car_currentPose.orientation.z,car_currentPose.orientation.w]
-            euler1=euler_from_quaternion(q1)
-            euler2=euler_from_quaternion(q2)
-            theta_dleta=euler2[2]-euler1[2]
-            if abs(theta_dleta)>0.4 :
-                 theta_dleta=0.0
-            q=quaternion_from_euler(0,0,theta_last+theta_dleta)
-
-            Odom.pose.pose.orientation.x = q[0]
-            Odom.pose.pose.orientation.y = q[1]
-            Odom.pose.pose.orientation.z = q[2]
-            Odom.pose.pose.orientation.w = q[3]
-
-        else:
-            Odom=Odom_last
-
-        time1_diff=time_now-car_currentTime
-        time2_diff=time_now-cam_currentTime
-        car_diff=abs(car_currentPose.position.x-car_lastPose.position.x)+abs(car_currentPose.position.y-car_lastPose.position.y)
-        if car_diff>4.0 or time2_diff.to_sec()>180. or time1_diff.to_sec()>5.:
-            if car_diff>4.0 or enableMoveFlag:
-                if barFlag:
-                    OdomPub.publish(Odom)
-                    q=[Odom.pose.pose.orientation.x,Odom.pose.pose.orientation.y,Odom.pose.pose.orientation.z,Odom.pose.pose.orientation.w]
-                    M=tf.transformations.quaternion_matrix(q)
-                    Rbc=M[:3,:3]
-                    Tbc=np.array([Odom.pose.pose.position.x,Odom.pose.pose.position.y,Odom.pose.pose.position.z])
-                    if odom_combined_tf != None:
-                        Rcb=Rbc.T
-                        T=-Rcb.dot(Tbc)
-                        M=np.identity(4)
-                        M[:3,:3]=Rcb
-                        q=tf.transformations.quaternion_from_matrix(M)
-                        odom_combined_tf.sendTransform(T,q,
-                            time_now,
-                            "/odom_combined",
-                            "/base_footprint")
-                    if odom_combined_tf2 != None:
-                        M=np.identity(4)
-                        M[:3,:3]=tf_rot
-                        q=tf.transformations.quaternion_from_matrix(M)
-                        odom_combined_tf2.sendTransform(tf_trans,q,
-                            time_now,
-                            "/ORB_SLAM/World",
-                            "/odom_combined")
-                    mStatusLock.release()
-                    return
-                #发布navFlag
-                if navFlag_pub!=None:
-                    navFlag=Bool()
-                    navFlag.data=True
-                    navFlag_pub.publish(navFlag)
-
-                #发布全局禁止ｆｌａｇ
-                globalMoveFlag=Bool()
-                globalMoveFlag.data=False
-                globalMovePub.publish(globalMoveFlag)
-                CarTwist = Twist()
-                velPub.publish(CarTwist)
-                car_lastPose=car_currentPose
-                cam_currentTime=rospy.Time.now()
-                car_currentTime=rospy.Time.now()
+    time1_diff=time_now-car_currentTime
+    time2_diff=time_now-cam_currentTime
+    car_diff=abs(car_currentPose.position.x-car_lastPose.position.x)+abs(car_currentPose.position.y-car_lastPose.position.y)
+    if car_diff>4.0 or time2_diff.to_sec()>180. or time1_diff.to_sec()>5.:
+        if car_diff>4.0 or enableMoveFlag:
+            if barFlag and not begin_flag:
+                if odom2map_tf != None:
+                    T=Mhf[:3,3]
+                    M=np.identity(4)
+                    M[:3,:3]=Mhf[:3,:3]
+                    q=tf.transformations.quaternion_from_matrix(M)
+                    odom2map_tf.sendTransform(T,q,
+                        time_now,
+                        "/odom",
+                        "/map")
+                if odom2map_tf2 != None:
+                    M=np.identity(4)
+                    M[:3,:3]=tf_rot
+                    q=tf.transformations.quaternion_from_matrix(M)
+                    odom2map_tf2.sendTransform(tf_trans,q,
+                        time_now,
+                        "/ORB_SLAM/World",
+                        "/map")
                 mStatusLock.release()
                 return
+            #发布navFlag
+            if navFlag_pub!=None:
+                navFlag=Bool()
+                navFlag.data=True
+                navFlag_pub.publish(navFlag)
+
+            #发布全局禁止ｆｌａｇ
+            globalMoveFlag=Bool()
+            globalMoveFlag.data=False
+            globalMovePub.publish(globalMoveFlag)
+            CarTwist = Twist()
+            velPub.publish(CarTwist)
+            car_lastPose=car_currentPose
+            cam_currentTime=rospy.Time.now()
+            car_currentTime=rospy.Time.now()
+            mStatusLock.release()
+            return
 
     if carUpdateFlag:
         car_lastPose=car_currentPose
@@ -280,52 +244,29 @@ def doOdomPub():
     camUpdateFlag=False
     carUpdateFlag=False
 
-    if begin_flag:
-        Odom_last=Odom
-        begin_flag=False
-
     mStatusLock.release()
-    #计算速度
-    Odom.child_frame_id = "base_footprint"
-    Odom.twist.twist.linear.x = 30*(Odom.pose.pose.position.x-Odom_last.pose.pose.position.x)
-    Odom.twist.twist.linear.y = 30*(Odom.pose.pose.position.y-Odom_last.pose.pose.position.y)
 
-    #如果速度大于２米每秒，发布清楚障碍物分布命令
-    # if ClearPub!=None and abs(Odom.twist.twist.linear.x)+abs(Odom.twist.twist.linear.y) > 2.0 and abs(Odom.twist.twist.linear.x)+abs(Odom.twist.twist.linear.y) < 3.0:
-    #     clearFlag=Bool()
-    #     clearFlag.data=True
-    #     ClearPub.publish(clearFlag)
+    if begin_flag:
+        return
 
-    q1=[Odom_last.pose.pose.orientation.x,Odom_last.pose.pose.orientation.y,Odom_last.pose.pose.orientation.z,Odom_last.pose.pose.orientation.w]
-    euler1=euler_from_quaternion(q1)
-    q2=[Odom.pose.pose.orientation.x,Odom.pose.pose.orientation.y,Odom.pose.pose.orientation.z,Odom.pose.pose.orientation.w]
-    euler2=euler_from_quaternion(q2)
-    Odom.twist.twist.angular.z = (euler2[2]-euler1[2])*30.
-
-    OdomPub.publish(Odom)
-    q=[Odom.pose.pose.orientation.x,Odom.pose.pose.orientation.y,Odom.pose.pose.orientation.z,Odom.pose.pose.orientation.w]
-    M=tf.transformations.quaternion_matrix(q)
-    Rbc=M[:3,:3]
-    Tbc=np.array([Odom.pose.pose.position.x,Odom.pose.pose.position.y,Odom.pose.pose.position.z])
-    if odom_combined_tf != None:
-        Rcb=Rbc.T
-        T=-Rcb.dot(Tbc)
+    if odom2map_tf != None:
+        T=Mhf[:3,3]
         M=np.identity(4)
-        M[:3,:3]=Rcb
+        M[:3,:3]=Mhf[:3,:3]
         q=tf.transformations.quaternion_from_matrix(M)
-        odom_combined_tf.sendTransform(T,q,
+        odom2map_tf.sendTransform(T,q,
             time_now,
-            "/odom_combined",
-            "/base_footprint")
-    if odom_combined_tf2 != None:
+            "/odom",
+            "/map")
+    if odom2map_tf2 != None:
         M=np.identity(4)
         M[:3,:3]=tf_rot
         q=tf.transformations.quaternion_from_matrix(M)
-        odom_combined_tf2.sendTransform(tf_trans,q,
+        odom2map_tf2.sendTransform(tf_trans,q,
             time_now,
             "/ORB_SLAM/World",
-            "/odom_combined")
-    Odom_last=Odom
+            "/map")
+
 
 def dealCarStatus(carStatu):
     global barFlag
@@ -336,13 +277,13 @@ def dealCarStatus(carStatu):
         barFlag=False
 
 def init():
-    global orbInitFlag, OdomPub,scale,odom_combined_tf,odom_combined_tf2,orbStartFlag
+    global orbInitFlag,scale,odom2map_tf,odom2map_tf2,orbStartFlag
     global velPub,getTrackThread,globalMovePub
     global cam_currentTime,car_currentTime
     global barFlag,navFlag_pub,ClearPub,enableMoveFlag
     barFlag=False
 
-    rospy.init_node("odom_combined", anonymous=True)
+    rospy.init_node("odom2map", anonymous=True)
     cam_currentTime=rospy.Time.now()
     car_currentTime=rospy.Time.now()
     scaleOrbFlag=rospy.get_param('/orb2base_scaleFlag',True)
@@ -360,8 +301,8 @@ def init():
         rospy.set_param('/orb2base_scale',scale)
         fp3.close
         print "scale: "+str(scale)
-    odom_combined_tf=tf.TransformBroadcaster()
-    odom_combined_tf2=tf.TransformBroadcaster()
+    odom2map_tf=tf.TransformBroadcaster()
+    odom2map_tf2=tf.TransformBroadcaster()
     rospy.Subscriber("/system_monitor/report", Status, systemStatusHandler)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, cameraOdom)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, carOdom)
@@ -390,18 +331,16 @@ def init():
         time.sleep(1)
     if getTrackThread != None:
         getTrackThread.stop()
-    OdomPub = rospy.Publisher("/odom_combined", Odometry, queue_size=5)
 
 
 if __name__ == "__main__":
     init()
-    rate = rospy.Rate(30)
+    rate = rospy.Rate(40)
     tilt_pub = rospy.Publisher('/set_tilt_degree', Int16 , queue_size=1)
     i=0
     while not rospy.is_shutdown():
-        if OdomPub!=None:
-            doOdomPub()
-        if i>3:
+        doTfPub()
+        if i>4:
             i=0
             tilt_degree=Int16()
             tilt_degree.data=-19

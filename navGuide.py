@@ -7,7 +7,7 @@ import roslib
 import rospy
 import actionlib
 from actionlib_msgs.msg import *
-from geometry_msgs.msg import Pose, Point, Quaternion, Twist
+from geometry_msgs.msg import Pose, Point, Quaternion, Twist,PoseStamped
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
@@ -19,13 +19,15 @@ import math
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import Int32,Bool
+import tf
 
 scale = 1.
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
 tf_trans=np.array([0.0,0.0,0.])
 
 NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
-currentPose=Pose();
+currentPose=Pose()
+currentPoseStamped=PoseStamped();
 mStatusLock = threading.Lock()
 poseFlag=False
 
@@ -35,11 +37,12 @@ playFlagTime=None
 status=1
 
 def getOdom(odom):
-    global currentPose,poseFlag
+    global currentPoseStamped,poseFlag
     mStatusLock.acquire()
     if odom != None:
         poseFlag=True
-        currentPose=odom.pose.pose; #更新坐标
+        currentPoseStamped.pose=odom.pose.pose; #更新坐标
+        currentPoseStamped.header=odom.header
     else:
         poseFlag=False
     mStatusLock.release()
@@ -79,13 +82,13 @@ def dealCarStatus(carStatu):
 class MoveBaseSquare:
 
     def __init__(self):
-        global tf_trans,tf_rot,scale,poseFlag,currentPose
+        global tf_trans,tf_rot,scale,poseFlag,currentPose,currentPoseStamped
 
         rospy.init_node('nav_guide', anonymous=False)
 
         rospy.on_shutdown(self.shutdown)
 
-        odomSub=rospy.Subscriber("/odom_combined", Odometry, getOdom)
+        odomSub=rospy.Subscriber("xqserial_server/Odom", Odometry, getOdom)
         carStatuSub=rospy.Subscriber("/xqserial_server/StatusFlag", Int32, dealCarStatus)
         self.move_base=None
 
@@ -148,14 +151,32 @@ class MoveBaseSquare:
         self.init_markers()
 
         mStatusLock.acquire()
+
+        listener=tf.TransformListener(True, rospy.Duration(10.0))
+        tfFlag=False
+
+        while not tfFlag and not rospy.is_shutdown():
+            try:
+                listener.waitForTransform("map","odom",rospy.Time(),rospy.Duration(1.0))
+                now = rospy.Time.now()
+                listener.waitForTransform("map","odom",now,rospy.Duration(1.0))
+                tfFlag=True
+
+            except (tf.LookupException,tf.ConnectivityException,tf.ExtrapolationException,tf.Exception):
+                print "oups\n"
+                tfFlag=False
+
         #获取当前机器人坐标系
         while not poseFlag and not rospy.is_shutdown():
             mStatusLock.release()
-            time.sleep(1)
+            time.sleep(0.1)
             mStatusLock.acquire()
         mStatusLock.release()
         odomSub.unregister()
-
+        #将机器人坐标系转换成map坐标系
+        currentPoseStamped.header.stamp=now
+        currentPoseStamped = listener.transformPose("/map",currentPoseStamped)
+        currentPose = currentPoseStamped.pose
         max_index=len(waypoints)-1
         mindist_index=0
         mindist=-1;
@@ -222,7 +243,7 @@ class MoveBaseSquare:
                         else:
                             upDirt=False
                 i=i+1
-        # print "updirt:"+str(upDirt)
+        print "updirt:"+str(upDirt)
         # while not rospy.is_shutdown():
         #     time.sleep(1)
 
@@ -284,7 +305,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(5)
+                    time.sleep(1)
 
                 i = 0
                 # Cycle through the four waypoints
@@ -320,7 +341,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(5)
+                    time.sleep(1)
             else:
                 # Initialize a counter to track waypoints
                 # 初始化一个计数器，记录到达的顶点号
@@ -358,7 +379,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(5)
+                    time.sleep(1)
                 i = max_index
                 # Cycle through the four waypoints
                 # 主循环,环绕通过四个定点
@@ -393,7 +414,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(5)
+                    time.sleep(1)
 
 
     def move(self, goal):

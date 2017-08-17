@@ -4,7 +4,7 @@
 import rospy
 from std_msgs.msg import String, UInt32, Float64, Bool,Int16
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist, Pose2D, Pose
+from geometry_msgs.msg import Twist, Pose2D, Pose,PoseStamped
 from sensor_msgs.msg import Image
 from system_monitor.msg import *
 import threading
@@ -47,7 +47,8 @@ powerLow = 10.0
 mStatusLock = threading.Lock()
 
 dataCache = []
-currentPose=Pose();
+currentPoseStamped=PoseStamped()
+currentPose=Pose()
 sendData=bytearray([205,235,215,24,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
 speed_cmd=Twist()
 
@@ -64,6 +65,10 @@ tf_trans=np.array([0.0,0.0,0.])
 navFlag=False
 tilt_pub=None
 nav_lastTime=None
+
+Thf=[0.0,0.0,0.0]
+Qhf=[0.0,0.0,0.0,1.0]
+
 def getDataFromReq(req):
     pass
 
@@ -160,9 +165,9 @@ def parseData(cmds):
                      if not mapthread.stopped():
                          print "关闭视觉2"
                          mapthread.stop()
-                     os.system("pkill -f odom_combined.py")
+                     os.system("pkill -f odom2map.py")
                      os.system("pkill -f navGuide.py")
-                     os.system("pkill -f mono")
+                     os.system("pkill -f orb_slam")
                      os.system("pkill -f map_server")
                      os.system("pkill -f move_base")
                      os.system("pkill -f odom_map_broadcaster")
@@ -234,9 +239,9 @@ def parseData(cmds):
                     speed_cmd.angular.z = 0
                     cmd_pub.publish(speed_cmd)
                     navFlag=False
-                    os.system("pkill -f odom_combined.py")
+                    os.system("pkill -f odom2map.py")
                     os.system("pkill -f navGuide.py")
-                    os.system("pkill -f mono")
+                    os.system("pkill -f orb_slam")
                     os.system("pkill -f map_server")
                     os.system("pkill -f move_base")
                     os.system("pkill -f odom_map_broadcaster")
@@ -408,11 +413,12 @@ def getImage(image):
     mStatusLock.release()
 
 def getOdom(odom):
-    global currentPose
+    global currentPoseStamped
     mStatusLock.acquire()
     if odom != None:
         mStatus.odomStatus = True
-        currentPose=odom.pose.pose; #更新坐标
+        currentPoseStamped.pose=odom.pose.pose; #更新坐标
+        currentPoseStamped.header=odom.header #更新坐标
 
     else:
         mStatus.odomStatus = False
@@ -465,7 +471,7 @@ def broadcast():
     nav_lastTime=rospy.Time.now()
     rospy.Subscriber("/xqserial_server/Power", Float64, getPower)
     rospy.Subscriber("/usb_cam/image_raw", Image, getImage)
-    rospy.Subscriber("/odom_combined", Odometry, getOdom)
+    rospy.Subscriber("/xqserial_server/Odom", Odometry, getOdom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
     rospy.Subscriber("/ORB_SLAM/GC", Bool, getOrbGCStatus)
@@ -567,6 +573,7 @@ if __name__ == "__main__":
     i=10
     ii=40
     cmd4="aplay /home/xiaoqiang/Desktop/d.wav"
+    listener=tf.TransformListener(True, rospy.Duration(10.0))
     while not rospy.is_shutdown():
         # #每２秒提示一下
         # if ii==10:
@@ -583,11 +590,27 @@ if __name__ == "__main__":
         ii+=1
         #持续反馈状态
         if UserSocket_remote!=None and UserSerSocket!=None:
+            tfFlag=False
+            try:
+                currentPoseStamped = listener.transformPose("/map",currentPoseStamped)
+                tfFlag=True
+
+                (Thf,Qhf) = listener.lookupTransform("/map", "/odom", currentPoseStamped.header.stamp)
+            except (tf.LookupException,tf.ConnectivityException,tf.ExtrapolationException,tf.Exception):
+                tfFlag=False
+
+            #将机器人坐标系转换成map坐标系
+            currentPose = currentPoseStamped.pose
 
             Tbc=np.array([currentPose.position.x,currentPose.position.y,currentPose.position.z])
             q=[currentPose.orientation.x,currentPose.orientation.y,currentPose.orientation.z,currentPose.orientation.w]
             M=tf.transformations.quaternion_matrix(q)
             Rbc=M[:3,:3]
+            if not tfFlag:
+                M=tf.transformations.quaternion_matrix(Qhf)
+                Rhf=M[:3,:3]
+                Rbc=Rhf.dot(Rbc)
+                Tbc=Rhf.dot(Tbc)+Thf
 
             ax,ay,theta_send=tf.transformations.euler_from_matrix(Rbc)
             #为了简化计算，下文的计算中base_link 和base_footprint被看成是相同的坐标系
@@ -606,7 +629,7 @@ if __name__ == "__main__":
             sendData[12:16]=map(ord,struct.pack('f',Tad[2]))
             sendData[16:20]=map(ord,struct.pack('f',mStatus.power))
             sendData[24:28]=map(ord,struct.pack('f',theta_send))
-            if mStatus.odomStatus or navFlag or not navthread.stopped():
+            if tfFlag or navFlag or not navthread.stopped():
                 statu0=0x01 #混合里程计
             else:
                 statu0=0x00
