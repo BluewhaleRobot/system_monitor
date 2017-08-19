@@ -29,12 +29,14 @@ NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
 currentPose=Pose()
 currentPoseStamped=PoseStamped();
 mStatusLock = threading.Lock()
+mStatus2Lock = threading.Lock()
 poseFlag=False
 
 playFlag=False
 playStartTime=None
 playFlagTime=None
 status=1
+move_base_status=1
 
 def getOdom(odom):
     global currentPoseStamped,poseFlag
@@ -52,9 +54,16 @@ def dealCarStatus(carStatu):
 
     cmd1="aplay /home/xiaoqiang/Desktop/speaker.wav"
     cmd2="aplay /home/xiaoqiang/Desktop/engine.wav"
-    status=carStatu.data
-    time_now=rospy.Time.now()
 
+
+    mStatus2Lock.acquire()
+    if move_base_status ==1 :
+        status=carStatu.data
+    else:
+        status=2
+    mStatus2Lock.release()
+
+    time_now=rospy.Time.now()
     if status!=2 or playFlagTime ==None:
         playFlagTime=time_now
 
@@ -79,6 +88,12 @@ def dealCarStatus(carStatu):
             elif time_diff.to_sec()>22.0:
                 playFlagTime=time_now
 
+def dealCarStatus2(moveBaseStatu):
+    global move_base_status
+    mStatus2Lock.acquire()
+    move_base_status=moveBaseStatu.data
+    mStatus2Lock.release()
+
 class MoveBaseSquare:
 
     def __init__(self):
@@ -90,6 +105,7 @@ class MoveBaseSquare:
 
         odomSub=rospy.Subscriber("xqserial_server/Odom", Odometry, getOdom)
         carStatuSub=rospy.Subscriber("/xqserial_server/StatusFlag", Int32, dealCarStatus)
+        carStatuSub2=rospy.Subscriber("/move_base/StatusFlag", Int32, dealCarStatus2)
         self.move_base=None
 
         navDataFile = open(NAV_POINTS_FILE, "r")
