@@ -441,7 +441,7 @@ class MoveBaseSquare:
 
             # Allow 1 minute to get there
             # 设定1分钟的时间限制
-            finished_within_time = self.move_base.wait_for_result(rospy.Duration(480))
+            finished_within_time = self.move_base.wait_for_result(rospy.Duration(880))
 
             # If we don't get there in time, abort the goal
             # 如果一分钟之内没有到达，放弃目标

@@ -446,7 +446,7 @@ def getglobalMoveFlag(moveEn):
         #关闭视觉导航
         if not navthread.stopped():
             navthread.stop()
-            navFlag=False=False
+            navFlag=False
 
 def getNavFlag(navRun):
     global navFlag,navthread
