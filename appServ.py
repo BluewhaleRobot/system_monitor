@@ -251,7 +251,7 @@ def broadcast():
     rospy.Subscriber("/xqserial_server/Power", Float64, getPower)
     rospy.Subscriber("/usb_cam/image_raw", Image, getImage)
     rospy.Subscriber("/odom_combined", Odometry, getOdom)
-    rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
+    rospy.Subscriber("/ORB_SLAM/Camera", rospy.msg.AnyMsg, getOrbTrackingFlag)
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
     rospy.Subscriber("/globalMoveFlag", Bool, getglobalMoveFlag)
     rospy.Subscriber('/nav_setStop', Bool, getNavFlag)

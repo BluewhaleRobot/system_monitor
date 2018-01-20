@@ -90,7 +90,7 @@ def monitor():
     rospy.Subscriber("/ORB_SLAM/Frame", Image, getOrbStartStatus)
     rospy.Subscriber("/xqserial_server/Power", Float64, getPower)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, getOdom)
-    rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
+    rospy.Subscriber("/ORB_SLAM/Camera", rospy.msg.AnyMsg, getOrbTrackingFlag)
     rospy.Subscriber("/orb_scale/scaleStatus", Bool, getOrbScaleStatus)
     reportPub = rospy.Publisher('/system_monitor/report', Status , queue_size
 =0)
