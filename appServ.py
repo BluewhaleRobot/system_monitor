@@ -120,7 +120,7 @@ def parseData(cmds):
 
             if cmds[count][0]==0xaa and cmds[count][1]==0x44:
                 print "system poweroff"
-                status, output = commands.getstatusoutput('sudo shutdown -h now')
+                status, output = commands.getstatusoutput('/sbin/shutdown -h now')
 
             if cmds[count][0]==ord('f'):
                 print "forward"
