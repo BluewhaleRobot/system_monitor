@@ -321,7 +321,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(1)
+                    time.sleep(5)
 
                 i = 0
                 # Cycle through the four waypoints
@@ -357,7 +357,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(1)
+                    time.sleep(5)
             else:
                 # Initialize a counter to track waypoints
                 # 初始化一个计数器，记录到达的顶点号
@@ -395,7 +395,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(1)
+                    time.sleep(5)
                 i = max_index
                 # Cycle through the four waypoints
                 # 主循环,环绕通过四个定点
@@ -430,7 +430,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(1)
+                    time.sleep(5)
 
 
     def move(self, goal):
