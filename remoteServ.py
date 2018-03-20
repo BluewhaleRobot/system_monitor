@@ -22,6 +22,7 @@ import numpy as  np
 from utils.req_parser import ReqParser
 from utils.monitor_servers import UserSer
 from utils.config import BROADCAST_PORT
+from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 
 ROBOT_STATUS = Status()
 ROBOT_STATUS.brightness = 0.0
@@ -31,6 +32,9 @@ ROBOT_STATUS.orbStartStatus = False
 ROBOT_STATUS.orbInitStatus = False
 ROBOT_STATUS.power = 0.0
 ROBOT_STATUS.orbScaleStatus = False
+
+ROBOT_CONTROL_TWIST = None
+ROBOT_REAL_TWIST = None
 
 ROBOT_STATUS_LOCK = threading.Lock()
 
@@ -68,16 +72,21 @@ def get_image(image):
     ROBOT_STATUS_LOCK.release()
 
 def get_odom(odom):
-    global ROBOT_POSESTAMPED
+    global ROBOT_POSESTAMPED, ROBOT_REAL_TWIST, ROBOT_STATUS
     ROBOT_STATUS_LOCK.acquire()
     if odom != None:
         ROBOT_STATUS.odomStatus = True
         ROBOT_POSESTAMPED.pose=odom.pose.pose; #更新坐标
         ROBOT_POSESTAMPED.header=odom.header #更新坐标
-
+        ROBOT_REAL_TWIST = odom.twist
     else:
         ROBOT_STATUS.odomStatus = False
     ROBOT_STATUS_LOCK.release()
+
+def get_cmd_vel(twist):
+    global ROBOT_CONTROL_TWIST
+    if twist != None:
+        ROBOT_CONTROL_TWIST = twist
 
 def get_orb_start_status(orb_frame):
     ROBOT_STATUS_LOCK.acquire()
@@ -118,6 +127,7 @@ def get_orbgba_status(gba_flag):
     ROBOT_STATUS.orbGBAFlag = gba_flag.data
     ROBOT_STATUS_LOCK.release()
 
+
 def init_sub_pubs():
     rospy.init_node("broadcast", anonymous=True)
     NAV_LASTTIME = rospy.Time.now()
@@ -130,17 +140,20 @@ def init_sub_pubs():
     rospy.Subscriber("/ORB_SLAM/GBA", Bool, get_orbgba_status)
     rospy.Subscriber("/global_move_flag", Bool, get_global_move_flag)
     rospy.Subscriber('/nav_setStop', Bool, get_nav_flag)
+    rospy.Subscriber('/cmd_vel', Twist, get_cmd_vel)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool , queue_size=1)
     ELEVATOR_PUB = rospy.Publisher('/elevatorPose', UInt32 , queue_size=1)
     CMD_VEL_PUB = rospy.Publisher('/cmd_vel', Twist , queue_size=0)
     MAPSAVE_PUB = rospy.Publisher('/map_save', Bool , queue_size=0)
     TILT_PUB = rospy.Publisher('/set_tilt_degree', Int16 , queue_size=0)
+    GALILEO_STATUS_PUB = rospy.Publisher('/galileo/status', GalileoStatus, queue_size=0)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
         "CMD_VEL_PUB": CMD_VEL_PUB,
         "MAPSAVE_PUB": MAPSAVE_PUB,
         "TILT_PUB": TILT_PUB,
+        "GALILEO_STATUS_PUB": GALILEO_STATUS_PUB,
     }
 
 if __name__ == "__main__":
@@ -269,6 +282,47 @@ if __name__ == "__main__":
             ROBOT_STATUS.odomStatus = False
             ROBOT_STATUS.orbGCFlag = False
             ROBOT_STATUS.orbGBAFlag = False
+
+        # 发布状态topic
+        galileo_status = GalileoStatus()
+        galileo_status.header = ROBOT_POSESTAMPED.header
+        galileo_status.navStatus = 0
+        if ROBOT_STATUS.orbInitStatus:
+            galileo_status.visualStatus = 1
+        else:
+            galileo_status.visualStatus = 2
+        if UserServer.nav_task != None:
+            galileo_status.navStatus = 1
+        else:
+            galileo_status.visualStatus = 0
+        galileo_status.power = ROBOT_STATUS.power
+        galileo_status.targetNumID = -1
+        if UserServer.nav_task != None:
+            galileo_status.targetNumID = UserServer.nav_task.current_goal_id
+        galileo_status.targetStatus = 0
+        if UserServer.nav_task != None:
+            if UserServer.nav_task.current_goal_status() == "FREE":
+                galileo_status.targetStatus = 0
+            if UserServer.nav_task.current_goal_status() == "WORKING":
+                galileo_status.targetStatus = 1
+            if UserServer.nav_task.current_goal_status() == "PAUSED":
+                galileo_status.targetStatus = 2
+            if UserServer.nav_task.current_goal_status() == "ERROR":
+                galileo_status.targetStatus = -1
+        galileo_status.targetDistance = -1
+        if UserServer.nav_task != None and \
+            (UserServer.nav_task.current_goal_status() == "WORKING" or \
+            UserServer.nav_task.current_goal_status() == "PAUSED"):
+            galileo_status.targetDistance = \
+                UserServer.nav_task.current_goal_distance()
+        galileo_status.angleGoalStatus = 1
+        if ROBOT_CONTROL_TWIST is not None and ROBOT_REAL_TWIST is not None:
+            galileo_status.controlSpeedX = ROBOT_CONTROL_TWIST.linear.x
+            galileo_status.controlSpeedTheta = ROBOT_CONTROL_TWIST.angular.z
+            galileo_status.currentSpeedX = ROBOT_REAL_TWIST.twist.linear.x
+            galileo_status.currentSpeedTheta = ROBOT_REAL_TWIST.twist.angular.z
+        pubs["GALILEO_STATUS_PUB"].publish(galileo_status)
+
         broadcast_count += 1;
         rate.sleep()
     UserServer.stop()

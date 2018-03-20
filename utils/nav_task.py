@@ -204,9 +204,9 @@ class NavTask():
             return -1
         self.currentPoseStamped.header.stamp = now
         self.currentPoseStamped = self.listener.transformPose("/map", self.currentPoseStamped)
-        currentPose = currentPoseStamped.pose
+        currentPose = self.currentPoseStamped.pose
         mgoal = self.waypoints[self.current_goal_id]
-        return self.distance(mgoal, currentPose)
+        return self.pose_distance(mgoal, currentPose)
 
 
     def pose_distance(self, pose1, pose2):

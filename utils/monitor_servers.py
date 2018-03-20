@@ -19,10 +19,12 @@ import tf
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
 import numpy as np
+from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from req_parser import ReqParser
 from config import MAX_VEL, MAX_THETA
 from scale_orb import ScaleORB
 from nav_task import NavTask
+
 
 
 class UserSer(threading.Thread):
@@ -53,9 +55,15 @@ class UserSer(threading.Thread):
         self.nav_task = None
         self.log("service started")
 
+        def get_galileo_cmds(cmds):
+            self.parse_data([map(lambda x: ord(x), list(cmds.data))])
+
+        rospy.Subscriber('/galileo/cmds', GalileoNativeCmds, get_galileo_cmds)
+
+
     def log(self, info):
-        with open("log.txt", "w+") as log_file:
-            log_file.write(info)
+        with open("log.txt", "a+") as log_file:
+            log_file.write(info + '\n')
 
     def stop(self):
         if self.USERSER_SOCKET!=None:
@@ -87,7 +95,6 @@ class UserSer(threading.Thread):
         time_now = rospy.Time.now()
         for count in range(0, len(cmds)):
             if len(cmds[count]) >= 2:
-                self.log(str(cmds[count][0]) + " " + str(cmds[count][1]))
             if len(cmds[count]) > 0:
                 self.CONTROL_FLAG = True
             #判断是否为关机命令
@@ -223,10 +230,8 @@ class UserSer(threading.Thread):
                         os.system("pkill -f move_base")
                         os.system("pkill -f odom_map_broadcaster")
                 elif cmds[count][0] == ord('g'):
-                    self.log("received g")
                     self.nav_task.set_goal(cmds[count][1])
                 elif cmds[count][0] == ord('i'):
-                    self.log("received i")
                     if cmds[count][1] == 0:
                         self.nav_task.pause()
                     if cmds[count][1] == 1:
