@@ -32,8 +32,8 @@ dataCache = []
 cmd_pub=None
 mapSave_pub=None
 
-maxVel=0.8
-maxTheta=3.6
+maxVel=1.3
+maxTheta=3.0
 mStatus = Status()
 mStatus.brightness = 0.0
 mStatus.imageStatus = False
@@ -42,7 +42,7 @@ mStatus.orbStartStatus = False
 mStatus.orbInitStatus = False
 mStatus.power = 0.0
 mStatus.orbScaleStatus = False
-powerLow = 10.0
+powerLow = 36.8
 
 mStatusLock = threading.Lock()
 
@@ -113,10 +113,19 @@ def parseData(cmds):
     for count in range(0, len(cmds)):
         if len(cmds[count])>0:
             control_flag=True
+            globalMoveFlag=Bool()
+            globalMoveFlag.data=True
+            globalMovePub.publish(globalMoveFlag)
         #判断是否为关机命令
         if len(cmds[count])==2:
             globalMoveFlag=Bool()
             globalMoveFlag.data=True
+
+            temp_scale=1.0
+            if abs(speed_cmd.linear.x)<1.0 :
+                temp_scale=1.0
+            else:
+                temp_scale=abs(speed_cmd.linear.x)
 
             if cmds[count][0]==0xaa and cmds[count][1]==0x44:
                 print "system poweroff"
@@ -135,12 +144,18 @@ def parseData(cmds):
             elif cmds[count][0]==ord('c'):
                 print "circleleft"
                 globalMovePub.publish(globalMoveFlag)
-                speed_cmd.angular.z=maxTheta*cmds[count][1]/100.0/2.8
+                if cmds[count][1]>1:
+                    speed_cmd.angular.z=max(0.4,maxTheta*cmds[count][1]/100.0/temp_scale)
+                else:
+                    speed_cmd.angular.z=maxTheta*cmds[count][1]/100.0/temp_scale
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('d'):
                 print "circleright"
                 globalMovePub.publish(globalMoveFlag)
-                speed_cmd.angular.z=-maxTheta*cmds[count][1]/100.0/2.8
+                if cmds[count][1]>1:
+                    speed_cmd.angular.z=min(-0.4,-maxTheta*cmds[count][1]/100.0/temp_scale)
+                else:
+                    speed_cmd.angular.z=-maxTheta*cmds[count][1]/100.0/temp_scale
                 cmd_pub.publish(speed_cmd)
             elif cmds[count][0]==ord('s'):
                 print "stop"
