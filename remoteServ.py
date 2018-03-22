@@ -38,7 +38,7 @@ ROBOT_REAL_TWIST = None
 
 ROBOT_STATUS_LOCK = threading.Lock()
 
-ROBOT_POSESTAMPED = PoseStamped()
+ROBOT_POSESTAMPED = None
 
 SEND_DATA = bytearray(
 [205, 235, 215, 32, 0x00, 0x00, 0x00, 0x00,
@@ -50,7 +50,7 @@ SEND_DATA = bytearray(
 CONTROL_FLAG = False
 
 TF_ROT = np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-TF_TRANS = np.array([0.0,0.0,0.])
+TF_TRANS = np.array([0.4,0.0,0.])
 TILT_PUB = None
 NAV_LASTTIME = None
 
@@ -76,6 +76,7 @@ def get_odom(odom):
     ROBOT_STATUS_LOCK.acquire()
     if odom != None:
         ROBOT_STATUS.odomStatus = True
+        ROBOT_POSESTAMPED = PoseStamped()
         ROBOT_POSESTAMPED.pose=odom.pose.pose; #更新坐标
         ROBOT_POSESTAMPED.header=odom.header #更新坐标
         ROBOT_REAL_TWIST = odom.twist
@@ -107,12 +108,12 @@ def get_orb_tracking_flag(cam_pose):
 def get_global_move_flag(moveEn):
     if not moveEn.data:
         #关闭视觉导航
-        if not NAV_THREAD.stopped():
-            NAV_THREAD.stop()
+        if not UserServer.NAV_THREAD.stopped():
+            UserServer.NAV_THREAD.stop()
             UserServer.NAV_FLAG=False
 
 def get_nav_flag(navRun):
-    if navRun.data and not NAV_THREAD.stopped():
+    if navRun.data and not UserServer.NAV_THREAD.stopped():
         UserServer.NAV_FLAG=True
     else:
         UserServer.NAV_FLAG=False
@@ -185,7 +186,7 @@ if __name__ == "__main__":
             CONTROL_FLAG = False
         heart_beat_count += 1
         #持续反馈状态
-        if UserServer.get_connection_status():
+        if UserServer.get_connection_status() and ROBOT_POSESTAMPED is not None:
             tfFlag = False
             try:
                 ROBOT_POSESTAMPED = listener.transformPose("/map", ROBOT_POSESTAMPED)
@@ -208,14 +209,17 @@ if __name__ == "__main__":
 
             ax,ay,theta_send = tf.transformations.euler_from_matrix(Rbc)
             #为了简化计算，下文的计算中 base_link 和 base_footprint 被看成是相同的坐标系
-            Rbd = Rbc.dot(TF_ROT)
-            Tbd = Rbc.dot(TF_TRANS) + Tbc
+            #Rbd = Rbc.dot(TF_ROT)
+            #Tbd = Rbc.dot(TF_TRANS) + Tbc
 
             Rab = TF_ROT.T
             Tab = -Rab.dot(TF_TRANS)
 
-            Rad = Rab.dot(Rbd)
-            Tad = Rab.dot(Tbd)+Tab
+            #Rad = Rab.dot(Rbd)
+            #Tad = Rab.dot(Tbd)+Tab
+
+            Rad=Rab.dot(Rbc)
+            Tad=Rab.dot(Tbc)+Tab
 
             SEND_DATA[4:8] = map(ord,struct.pack('f',Tad[0]))
             SEND_DATA[8:12] = map(ord,struct.pack('f',Tad[1]))
@@ -311,8 +315,7 @@ if __name__ == "__main__":
                 galileo_status.targetStatus = -1
         galileo_status.targetDistance = -1
         if UserServer.nav_task != None and \
-            (UserServer.nav_task.current_goal_status() == "WORKING" or \
-            UserServer.nav_task.current_goal_status() == "PAUSED"):
+            UserServer.nav_task.current_goal_status() != "ERROR":
             galileo_status.targetDistance = \
                 UserServer.nav_task.current_goal_distance()
         galileo_status.angleGoalStatus = 1

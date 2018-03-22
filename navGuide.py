@@ -21,9 +21,9 @@ from tf.transformations import euler_from_quaternion
 from std_msgs.msg import Int32,Bool
 import tf
 
-scale = 1.
+scale = 1.05
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-tf_trans=np.array([0.0,0.0,0.])
+tf_trans=np.array([0.4,0.0,0.])
 
 NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
 currentPose=Pose()
@@ -131,7 +131,7 @@ class MoveBaseSquare:
             value_list=line.split(" ")
         scale=float(value_list[0])
         if scale<=0.000001:
-            scale=5.
+            scale=1.05
         rospy.set_param('/orb2base_scale',scale)
         fp3.close
         print "scale: "+str(scale)
@@ -160,7 +160,7 @@ class MoveBaseSquare:
             # Tbc=scale*(Rbd.dot(Tdc))+Tbd
 
             Tad=np.array([point[0],point[1], point[2]])
-            Tbc=scale*(tf_rot.dot(Tad))
+            Tbc=scale*(tf_rot.dot(Tad))+tf_trans
             waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
         # Initialize the visualization markers for RViz
         # 初始化可视化标记
@@ -321,7 +321,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(5)
+                    time.sleep(1)
 
                 i = 0
                 # Cycle through the four waypoints
@@ -357,7 +357,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i += 1
-                    time.sleep(5)
+                    time.sleep(1)
             else:
                 # Initialize a counter to track waypoints
                 # 初始化一个计数器，记录到达的顶点号
@@ -395,7 +395,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(5)
+                    time.sleep(1)
                 i = max_index
                 # Cycle through the four waypoints
                 # 主循环,环绕通过四个定点
@@ -430,7 +430,7 @@ class MoveBaseSquare:
                     self.move(goal)
 
                     i -= 1
-                    time.sleep(5)
+                    time.sleep(1)
 
 
     def move(self, goal):

@@ -33,6 +33,7 @@ class NavTask():
         self.NAV_POINTS_FILE = NAV_POINTS_FILE
         self.tf_rot = np.array([[ 0., 0.03818382, 0.99927073],
             [ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
+        self.tf_trans=np.array([0.4,0.0,0.])
         self.load_targets()
         self.init_markers()
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
@@ -58,14 +59,14 @@ class NavTask():
                 else:
                     self.currentPoseStamped = None
 
-        odom_sub = rospy.Subscriber("xqserial_server/Odom", Odometry, get_odom)
+        self.odom_sub = rospy.Subscriber("xqserial_server/Odom", Odometry, get_odom)
 
         def send_cmd_vel(msg):
             if self.goal_status == "PAUSED":
                 return
             self.cmd_vel_pub.publish(msg)
 
-        nav_cmd_vel_sub = rospy.Subscriber("/cmd_vel_nav", Twist, send_cmd_vel)
+        self.nav_cmd_vel_sub = rospy.Subscriber("/cmd_vel_nav", Twist, send_cmd_vel)
 
 
     def load_targets(self):
@@ -94,7 +95,7 @@ class NavTask():
         self.waypoints = list()
         for point in self.target_points:
             Tad=np.array([point[0],point[1], point[2]])
-            Tbc=scale*(self.tf_rot.dot(Tad))
+            Tbc=scale*(self.tf_rot.dot(Tad))+self.tf_trans
             self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
 
 
@@ -135,7 +136,8 @@ class NavTask():
         # Cancel any active goals
         if self.move_base != None:
             self.move_base.cancel_goal()
-
+        self.odom_sub.unregister()
+        self.nav_cmd_vel_sub.unregister()
         rospy.sleep(2)
         # Stop the robot
         self.cmd_vel_pub.publish(Twist())
@@ -169,7 +171,7 @@ class NavTask():
 
     def resume(self):
         if self.current_goal_status() == "PAUSED":
-            self.goal_status = "RESUME"
+            self.goal_status = "WORKING"
 
     def cancel_goal(self):
         if self.current_goal_status() != "FREE":

@@ -35,7 +35,7 @@ scale = 0.
 prviousCamPose = None
 prviousstamp = None
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-tf_trans=np.array([0.0,0.0,0.])
+tf_trans=np.array([0.4,0.0,0.])
 Mhf=np.identity(4)
 
 
@@ -91,7 +91,7 @@ class getTrack(threading.Thread):
         self.wait(3)
         CarTwist.angular.z = -0.3
         velPub.publish(CarTwist)
-        self.wait(4)
+        self.wait(8)
         CarTwist.angular.z = 0.
         velPub.publish(CarTwist)
         getTrackThread = None
@@ -171,12 +171,13 @@ def doTfPub():
         #转到odom_combined，得到camera在odom_combined中的pose
         Rbd=tf_rot.dot(Rad)
         Tbd=scale*(tf_rot.dot(Tad))+tf_trans
+        Tbd[2]=0;
         #由camera 的 pose 得到 base_footprint 的pose，这也是下文要发布的pose
         Rdc=tf_rot.T
         Tdc=-1/scale*(Rdc.dot(tf_trans))
         Rbc=Rbd.dot(Rdc)
         Tbc=scale*(Rbd.dot(Tdc))+Tbd
-        Tbc[2]=0.0
+        #Tbc[2]=0.0
 
         Mho=np.identity(4)
         Mho[:3,:3]=Rbc
@@ -297,7 +298,7 @@ def init():
             value_list=line.split(" ")
         scale=float(value_list[0])
         if scale<=0.000001:
-            scale=1.
+            scale=1.05
         rospy.set_param('/orb2base_scale',scale)
         fp3.close
         print "scale: "+str(scale)

@@ -96,10 +96,19 @@ class UserSer(threading.Thread):
         for count in range(0, len(cmds)):
             if len(cmds[count]) > 0:
                 self.CONTROL_FLAG = True
+                global_move_flag = Bool()
+                global_move_flag.data = True
+                self.GLOBAL_MOVE_PUB.publish(global_move_flag)
             #判断是否为关机命令
             if len(cmds[count]) == 2:
                 global_move_flag = Bool()
                 global_move_flag.data = True
+
+                temp_scale=1.0
+                if abs(self.SPEED_CMD.linear.x)<1.0 :
+                    temp_scale=1.0
+                else:
+                    temp_scale=abs(self.SPEED_CMD.linear.x)
 
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     print "system poweroff"
@@ -118,12 +127,20 @@ class UserSer(threading.Thread):
                 elif cmds[count][0] == ord('c'):
                     print "circleleft"
                     self.GLOBAL_MOVE_PUB.publish(global_move_flag)
-                    self.SPEED_CMD.angular.z = MAX_THETA * cmds[count][1]/100.0/2.8
+                    if cmds[count][1]>1:
+                        self.SPEED_CMD.angular.z=max(0.4,MAX_THETA*cmds[count][1]/100.0/temp_scale)
+                    else:
+                        self.SPEED_CMD.angular.z=MAX_THETA*cmds[count][1]/100.0/temp_scale
+                    #self.SPEED_CMD.angular.z = MAX_THETA * cmds[count][1]/100.0/2.8
                     self.CMD_VEL_PUB.publish(self.SPEED_CMD)
                 elif cmds[count][0] == ord('d'):
                     print "circleright"
                     self.GLOBAL_MOVE_PUB.publish(global_move_flag)
-                    self.SPEED_CMD.angular.z = -MAX_THETA * cmds[count][1]/100.0/2.8
+                    if cmds[count][1]>1:
+                        self.SPEED_CMD.angular.z = min(-0.4,-MAX_THETA*cmds[count][1]/100.0/temp_scale)
+                    else:
+                        self.SPEED_CMD.angular.z = -MAX_THETA*cmds[count][1]/100.0/temp_scale
+                    #self.SPEED_CMD.angular.z = -MAX_THETA * cmds[count][1]/100.0/2.8
                     self.CMD_VEL_PUB.publish(self.SPEED_CMD)
                 elif cmds[count][0] == ord('s'):
                     print "stop"

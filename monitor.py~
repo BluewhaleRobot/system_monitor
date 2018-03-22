@@ -25,7 +25,7 @@ mStatus.orbInitStatus = False
 mStatus.power = 0
 mStatus.orbScaleStatus = False
 powerFlagFilePath = "/home/xiaoqiang/Status/power"
-powerLow = 9.8
+powerLow = 9.6
 
 mStatusLock = threading.Lock()
 power_last=0
@@ -56,10 +56,10 @@ def getPower(power):
             #flagFile.write(str(power.data))
             #flagFile.close()
             lower_nums+=1
-#            if lower_nums>100:
-#                status, output = commands.getstatusoutput('sudo shutdown -h now')
+            if lower_nums>100:
+                status, output = commands.getstatusoutput('sudo shutdown -h now')
     lower_nums=0
-    power_last=power.data
+    power_last=power.data-0.3
     mStatusLock.release()
 
 def getOdom(odom):
