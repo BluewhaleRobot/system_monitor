@@ -42,11 +42,11 @@ class NavTask():
         self.move_base.wait_for_server(rospy.Duration(60))
         rospy.loginfo("Connected to move base server")
         rospy.loginfo("Starting navigation test")
-        self.nav_pause_flag = False
         self.currentPoseStamped = None
         self.status_lock = threading.Lock()
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.current_goal_id = -1
+        self.goal_status = "FREE"
 
 
         def get_odom(odom):
@@ -61,7 +61,7 @@ class NavTask():
         odom_sub = rospy.Subscriber("xqserial_server/Odom", Odometry, get_odom)
 
         def send_cmd_vel(msg):
-            if self.nav_pause_flag:
+            if self.goal_status == "PAUSED":
                 return
             self.cmd_vel_pub.publish(msg)
 
@@ -146,34 +146,36 @@ class NavTask():
             self.cancel_goal()
         # invalid goal id
         if goal_id > len(self.waypoints):
-            return False
+            self.goal_status = "ERROR"
+            return
         self.current_goal_id = goal_id
         self.marker_pub.publish(self.markers)
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = 'map'
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose = self.waypoints[goal_id]
+
         def done_cb(status, result):
-            self.nav_pause_flag = False
-            self.current_goal_id = -1
+            self.goal_status = "FREE"
+
         self.move_base.send_goal(goal, done_cb=done_cb)
+        self.goal_status = "WORKING"
 
 
     def pause(self):
         if self.current_goal_status() == "WORKING":
-            self.nav_pause_flag = True
+            self.goal_status = "PAUSED"
         self.cmd_vel_pub.publish(Twist())
 
     def resume(self):
         if self.current_goal_status() == "PAUSED":
-            self.nav_pause_flag = False
+            self.goal_status = "RESUME"
 
     def cancel_goal(self):
         if self.current_goal_status() != "FREE":
             self.move_base.cancel_goal()
             self.cmd_vel_pub.publish(Twist())
-        self.nav_pause_flag = False
-        self.current_goal_id = -1
+        self.goal_status = "FREE"
 
 
 
@@ -181,18 +183,17 @@ class NavTask():
     target status related
     """
     def current_goal(self):
-        return self.target_points[self.current_goal_id]
+        if self.current_goal_id != -1:
+            return self.target_points[self.current_goal_id]
+        return None
 
     def current_goal_status(self):
-        if self.current_goal_id == -1:
-            return "FREE"
-        if self.current_goal_id != -1 and self.nav_pause_flag:
-            return "PAUSED"
-        if self.current_goal_id != -1 and not self.nav_pause_flag:
-            return "WORKING"
+        return self.goal_status
 
     def current_goal_distance(self):
         # get current robot position
+        if self.current_goal_id == -1:
+            return -1
         now = rospy.Time.now()
         try:
             self.listener.waitForTransform("map", "odom", now,
