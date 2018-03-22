@@ -94,7 +94,6 @@ class UserSer(threading.Thread):
         res = None
         time_now = rospy.Time.now()
         for count in range(0, len(cmds)):
-            if len(cmds[count]) >= 2:
             if len(cmds[count]) > 0:
                 self.CONTROL_FLAG = True
             #判断是否为关机命令
