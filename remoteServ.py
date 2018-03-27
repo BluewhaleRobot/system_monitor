@@ -289,7 +289,8 @@ if __name__ == "__main__":
 
         # 发布状态topic
         galileo_status = GalileoStatus()
-        galileo_status.header = ROBOT_POSESTAMPED.header
+        if ROBOT_POSESTAMPED is not None:
+            galileo_status.header = ROBOT_POSESTAMPED.header
         galileo_status.navStatus = 0
         if ROBOT_STATUS.orbInitStatus:
             galileo_status.visualStatus = 1
