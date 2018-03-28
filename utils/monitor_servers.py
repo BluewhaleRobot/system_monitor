@@ -228,8 +228,9 @@ class UserSer(threading.Thread):
                             self.nav_task = NavTask()
                     if cmds[count][1]==4:
                         print "关闭自主巡检"
-                        self.nav_task.shutdown()
-                        self.nav_task = None
+                        if self.nav_test is not None:
+                            self.nav_task.shutdown()
+                            self.nav_task = None
                         tilt_degree = Int16()
                         tilt_degree.data = 0
                         self.TILT_PUB.publish(tilt_degree)
