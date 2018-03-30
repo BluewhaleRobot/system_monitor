@@ -35,7 +35,7 @@ scale = 0.
 prviousCamPose = None
 prviousstamp = None
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-tf_trans=np.array([0.4,0.0,0.])
+tf_trans=np.array([0.0,0.0,0.])
 Mhf=np.identity(4)
 
 

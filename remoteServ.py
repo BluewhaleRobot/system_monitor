@@ -50,7 +50,7 @@ SEND_DATA = bytearray(
 CONTROL_FLAG = False
 
 TF_ROT = np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-TF_TRANS = np.array([0.4,0.0,0.])
+TF_TRANS = np.array([0.0,0.0,0.])
 TILT_PUB = None
 NAV_LASTTIME = None
 

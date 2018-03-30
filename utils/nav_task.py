@@ -33,7 +33,7 @@ class NavTask():
         self.NAV_POINTS_FILE = NAV_POINTS_FILE
         self.tf_rot = np.array([[ 0., 0.03818382, 0.99927073],
             [ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-        self.tf_trans=np.array([0.4,0.0,0.])
+        self.tf_trans=np.array([0.0,0.0,0.])
         self.load_targets()
         self.init_markers()
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)

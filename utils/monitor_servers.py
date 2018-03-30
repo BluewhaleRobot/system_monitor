@@ -160,7 +160,7 @@ class UserSer(threading.Thread):
                              self.MAP_THREAD.stop()
                          os.system("pkill -f odom2map.py")
                          os.system("pkill -f navGuide.py")
-                         os.system("pkill -f orb_slam")
+                         os.system("pkill -f ORB_SALM")
                          os.system("pkill -f map_server")
                          os.system("pkill -f move_base")
                          os.system("pkill -f odom_map_broadcaster")
@@ -228,7 +228,7 @@ class UserSer(threading.Thread):
                             self.nav_task = NavTask()
                     if cmds[count][1]==4:
                         print "关闭自主巡检"
-                        if self.nav_test is not None:
+                        if self.nav_task is not None:
                             self.nav_task.shutdown()
                             self.nav_task = None
                         tilt_degree = Int16()
@@ -242,7 +242,7 @@ class UserSer(threading.Thread):
                         self.NAV_FLAG = False
                         os.system("pkill -f odom2map.py")
                         os.system("pkill -f navGuide.py")
-                        os.system("pkill -f orb_slam")
+                        os.system("pkill -f ORB_SLAM")
                         os.system("pkill -f map_server")
                         os.system("pkill -f move_base")
                         os.system("pkill -f odom_map_broadcaster")
@@ -289,7 +289,7 @@ class MapSer(threading.Thread):
 
         if self.P != None:
             self.psProcess = psutil.Process(pid=self.P.pid)
-            for child in self.psProcess.get_children(recursive=True):
+            for child in self.psProcess.children(recursive=True):
                 child.kill()
             self.psProcess.kill()
         self.P = None
@@ -301,9 +301,9 @@ class MapSer(threading.Thread):
 
     def run(self):
         self._stop.clear()
-        cmd="roslaunch orb_slam2 map.launch"
+        cmd="roslaunch ORB_SLAM2 map.launch"
         new_env=os.environ.copy()
-        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
+        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:/opt/ros/kinetic/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():
             if self.P == None and not self.stopped():
                 self.P = subprocess.Popen(cmd,shell=True,env=new_env)
@@ -341,7 +341,7 @@ class NavSer(threading.Thread):
         if self.P!=None :
             # print str(self.P.pid)
             self.psProcess = psutil.Process(pid=self.P.pid)
-            for child in self.psProcess.get_children(recursive=True):
+            for child in self.psProcess.children(recursive=True):
                 # print str(child.pid)
                 child.kill()
             self.psProcess.kill()
@@ -367,7 +367,7 @@ class NavSer(threading.Thread):
             cmd="roslaunch nav_test tank_blank_map0.launch"
 
         new_env=os.environ.copy()
-        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/jade/share:/opt/ros/jade/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
+        new_env['ROS_PACKAGE_PATH']='/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:/opt/ros/kinetic/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():
             if self.P == None and not self.stopped():
                 self.P = subprocess.Popen(cmd,shell=True,env=new_env)

@@ -23,7 +23,7 @@ import tf
 
 scale = 1.05
 tf_rot=np.array([[ 0., 0.03818382, 0.99927073],[ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-tf_trans=np.array([0.4,0.0,0.])
+tf_trans=np.array([0.0,0.0,0.])
 
 NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
 currentPose=Pose()
