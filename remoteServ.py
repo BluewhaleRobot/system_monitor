@@ -267,7 +267,7 @@ if __name__ == "__main__":
             else:
                 status5 = 0x00
             SEND_DATA[20] = statu0 + statu1 + statu2 + statu3 + status4 + status5
-            UserServer.sendto(bytes(SEND_DATA))
+        UserServer.sendto(bytes(SEND_DATA))
 
         #每秒广播一次
         if broadcast_count == 10:

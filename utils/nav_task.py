@@ -196,17 +196,16 @@ class NavTask():
         # get current robot position
         if self.current_goal_id == -1:
             return -1
-        now = rospy.Time.now()
+        if self.currentPoseStamped == None:
+            return -1
+
+        latest = rospy.Time(0)
+        self.currentPoseStamped.header.stamp = latest
         try:
-            self.listener.waitForTransform("map", "odom", now,
-                rospy.Duration(1.0))
+            self.currentPoseStamped = self.listener.transformPose("/map", self.currentPoseStamped)
         except (tf.LookupException, tf.ConnectivityException,
             tf.ExtrapolationException, tf.Exception):
             return -1
-        if self.currentPoseStamped == None:
-            return -1
-        self.currentPoseStamped.header.stamp = now
-        self.currentPoseStamped = self.listener.transformPose("/map", self.currentPoseStamped)
         currentPose = self.currentPoseStamped.pose
         mgoal = self.waypoints[self.current_goal_id]
         return self.pose_distance(mgoal, currentPose)
