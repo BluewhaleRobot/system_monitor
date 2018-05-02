@@ -273,7 +273,8 @@ class UserSer(threading.Thread):
 
     def sendto(self, data):
         try:
-            self.USERSER_SOCKET.sendto(bytes(data), self.USERSOCKET_REMOTE)
+            if self.get_connection_status():
+                self.USERSER_SOCKET.sendto(bytes(data), self.USERSOCKET_REMOTE)
         except:
             print "remote disconnect !\n"
 
@@ -318,7 +319,7 @@ class MapSer(threading.Thread):
         self._stop.clear()
         cmd = "roslaunch ORB_SLAM2 map.launch"
         if self.update:
-            cmd = "roslaunch ORB_SLAM2 map.launch"
+            cmd = "roslaunch nav_test update_map.launch"
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:/opt/ros/kinetic/stacks:/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
         while not self.stopped() and not rospy.is_shutdown():

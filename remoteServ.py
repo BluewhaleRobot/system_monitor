@@ -205,13 +205,15 @@ if __name__ == "__main__":
         if UserServer.get_connection_status() and ROBOT_POSESTAMPED is not None:
             tfFlag = False
             try:
+                listener.waitForTransform("/map", "/odom", ROBOT_POSESTAMPED.header.stamp, rospy.Duration(1.0))
                 ROBOT_POSESTAMPED = listener.transformPose(
                     "/map", ROBOT_POSESTAMPED)
                 tfFlag = True
                 (Thf, Qhf) = listener.lookupTransform(
                     "/map", "/odom", ROBOT_POSESTAMPED.header.stamp)
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception):
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception) as e:
                 tfFlag = False
+                print(e)
 
             # 将机器人坐标系转换成map坐标系
             currentPose = ROBOT_POSESTAMPED.pose
@@ -262,8 +264,8 @@ if __name__ == "__main__":
                     SEND_DATA[32:36] = map(ord, struct.pack('i',
                                                             UserServer.nav_task.current_goal_id))
 
-            if tfFlag or UserServer.NAV_FLAG or not UserServer.NAV_THREAD.stopped():
-                statu0 = 0x01  # 混合里程计
+            if UserServer.nav_task != None:
+                statu0 = 0x01  # 导航状态
             else:
                 statu0 = 0x00
             if ROBOT_STATUS.imageStatus:
@@ -296,7 +298,9 @@ if __name__ == "__main__":
             data = "xq"
             # 发送广播包
             try:
+                print("boradcast0")
                 s.sendto(data, ('<broadcast>', BROADCAST_PORT))
+                print("boradcast1")
             except:
                 continue
             # clear data
