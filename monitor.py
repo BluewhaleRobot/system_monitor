@@ -28,12 +28,14 @@ powerFlagFilePath = "/home/xiaoqiang/Status/power"
 powerLow = 9.8
 
 mStatusLock = threading.Lock()
-power_last=0
+power_last = 0
+
 
 def getBrightness(brightness):
     mStatusLock.acquire()
     mStatus.brightness = brightness.data
     mStatusLock.release()
+
 
 def getImage(image):
     mStatusLock.acquire()
@@ -43,24 +45,27 @@ def getImage(image):
         mStatus.imageStatus = False
     mStatusLock.release()
 
+
 def getPower(power):
-    global power_last,lower_nums
+    global power_last, lower_nums
 
     mStatusLock.acquire()
-    if mStatus.power<0.1:
-        power_last=power.data
-    if power_last< power.data+0.7 and power_last> power.data-0.7:
+    if mStatus.power < 0.1:
+        power_last = power.data
+    if power_last < power.data + 0.7 and power_last > power.data - 0.7:
         mStatus.power = power.data
-        if power.data < powerLow and power.data > 12.0: #and not os.path.isfile(powerFlagFilePath)
+        # and not os.path.isfile(powerFlagFilePath)
+        if power.data < powerLow and power.data > 12.0:
             #flagFile = open(powerFlagFilePath, "w+")
-            #flagFile.write(str(power.data))
-            #flagFile.close()
-            lower_nums+=1
+            # flagFile.write(str(power.data))
+            # flagFile.close()
+            lower_nums += 1
 #            if lower_nums>100:
 #                status, output = commands.getstatusoutput('sudo shutdown -h now')
-    lower_nums=0
-    power_last=power.data
+    lower_nums = 0
+    power_last = power.data
     mStatusLock.release()
+
 
 def getOdom(odom):
     mStatusLock.acquire()
@@ -70,6 +75,7 @@ def getOdom(odom):
         mStatus.odomStatus = False
     mStatusLock.release()
 
+
 def getOrbStartStatus(orb_frame):
     mStatusLock.acquire()
     if orb_frame != None:
@@ -78,6 +84,7 @@ def getOrbStartStatus(orb_frame):
         mStatus.orbStartStatus = False
     mStatusLock.release()
 
+
 def getOrbTrackingFlag(cam_pose):
     mStatusLock.acquire()
     if cam_pose != None:
@@ -85,6 +92,7 @@ def getOrbTrackingFlag(cam_pose):
     else:
         mStatus.orbInitStatus = False
     mStatusLock.release()
+
 
 def getOrbScaleStatus(flag):
     mStatusLock.acquire()
@@ -102,8 +110,7 @@ def monitor():
     rospy.Subscriber("/xqserial_server/Odom", Odometry, getOdom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, getOrbTrackingFlag)
     rospy.Subscriber("/orb_scale/scaleStatus", Bool, getOrbScaleStatus)
-    reportPub = rospy.Publisher('/system_monitor/report', Status , queue_size
-=0)
+    reportPub = rospy.Publisher('/system_monitor/report', Status, queue_size=0)
 
 
 if __name__ == "__main__":
@@ -112,7 +119,7 @@ if __name__ == "__main__":
 
     while not rospy.is_shutdown():
         mStatusLock.acquire()
-        if reportPub !=  "":
+        if reportPub != "":
             reportPub.publish(mStatus)
         # clear data
         mStatus.brightness = 0

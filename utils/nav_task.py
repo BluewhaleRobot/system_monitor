@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-#coding:utf-8
+# coding:utf-8
 
 import rospy
-from std_msgs.msg import String, UInt32, Float64, Bool,Int16
+from std_msgs.msg import String, UInt32, Float64, Bool, Int16
 from nav_msgs.msg import Odometry
 import actionlib
 from actionlib_msgs.msg import *
-from geometry_msgs.msg import Pose, Point, Quaternion, Twist,PoseStamped
+from geometry_msgs.msg import Pose, Point, Quaternion, Twist, PoseStamped
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from sensor_msgs.msg import Image
 import threading
@@ -16,7 +16,10 @@ from socket import *
 import commands
 import struct
 from geometry_msgs.msg import Twist
-import time,psutil,subprocess,signal
+import time
+import psutil
+import subprocess
+import signal
 import tf
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import Marker
@@ -31,14 +34,14 @@ class NavTask():
 
     def __init__(self, NAV_POINTS_FILE="/home/xiaoqiang/slamdb/nav.csv"):
         self.NAV_POINTS_FILE = NAV_POINTS_FILE
-        self.tf_rot = np.array([[ 0., 0.03818382, 0.99927073],
-            [ -1., 0.,0.], [0., -0.99927073, 0.03818382]])
-        self.tf_trans=np.array([0.0,0.0,0.])
+        self.tf_rot = np.array([[0., 0.03818382, 0.99927073],
+                                [-1., 0., 0.], [0., -0.99927073, 0.03818382]])
+        self.tf_trans = np.array([0.0, 0.0, 0.])
         self.load_targets()
         self.init_markers()
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
         self.move_base = actionlib.SimpleActionClient("move_base",
-            MoveBaseAction)
+                                                      MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
         self.move_base.wait_for_server(rospy.Duration(60))
         rospy.loginfo("Connected to move base server")
@@ -49,7 +52,6 @@ class NavTask():
         self.current_goal_id = -1
         self.goal_status = "FREE"
 
-
         def get_odom(odom):
             with self.status_lock:
                 if odom != None:
@@ -59,15 +61,16 @@ class NavTask():
                 else:
                     self.currentPoseStamped = None
 
-        self.odom_sub = rospy.Subscriber("xqserial_server/Odom", Odometry, get_odom)
+        self.odom_sub = rospy.Subscriber(
+            "xqserial_server/Odom", Odometry, get_odom)
 
         def send_cmd_vel(msg):
             if self.goal_status == "PAUSED":
                 return
             self.cmd_vel_pub.publish(msg)
 
-        self.nav_cmd_vel_sub = rospy.Subscriber("/cmd_vel_nav", Twist, send_cmd_vel)
-
+        self.nav_cmd_vel_sub = rospy.Subscriber(
+            "/cmd_vel_nav", Twist, send_cmd_vel)
 
     def load_targets(self):
         with open(self.NAV_POINTS_FILE, "r") as nav_data_file:
@@ -86,31 +89,31 @@ class NavTask():
         value_list = []
         with open("/home/xiaoqiang/slamdb/scale.txt", "r+") as scale_file:
             for line in scale_file:
-                value_list=line.split(" ")
+                value_list = line.split(" ")
         scale = float(value_list[0])
         if scale <= 0.000001:
             scale = 5.
         rospy.set_param('/orb2base_scale', scale)
-        print("scale: "+str(scale))
+        print("scale: " + str(scale))
         self.waypoints = list()
         for point in self.target_points:
-            Tad=np.array([point[0],point[1], point[2]])
-            Tbc=scale*(self.tf_rot.dot(Tad))+self.tf_trans
+            Tad = np.array([point[0], point[1], point[2]])
+            Tbc = scale * (self.tf_rot.dot(Tad)) + self.tf_trans
             self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
-
 
     def init_markers(self):
         # Set up our waypoint markers
         # 设置标记的尺寸
         marker_scale = 0.2
-        marker_lifetime = 0 # 0 is forever
+        marker_lifetime = 0  # 0 is forever
         marker_ns = 'waypoints'
         marker_id = 0
         marker_color = {'r': 1.0, 'g': 0.7, 'b': 1.0, 'a': 1.0}
 
         # Define a marker publisher.
         # 定义一个标记的发布者
-        self.marker_pub = rospy.Publisher('waypoint_markers', Marker, queue_size=0)
+        self.marker_pub = rospy.Publisher(
+            'waypoint_markers', Marker, queue_size=0)
 
         # Initialize the marker points list.
         # 初始化标记点的列表
@@ -163,7 +166,6 @@ class NavTask():
         self.move_base.send_goal(goal, done_cb=done_cb)
         self.goal_status = "WORKING"
 
-
     def pause(self):
         if self.current_goal_status() == "WORKING":
             self.goal_status = "PAUSED"
@@ -179,11 +181,10 @@ class NavTask():
             self.cmd_vel_pub.publish(Twist())
         self.goal_status = "FREE"
 
-
-
     """
     target status related
     """
+
     def current_goal(self):
         if self.current_goal_id != -1:
             return self.target_points[self.current_goal_id]
@@ -202,17 +203,17 @@ class NavTask():
         latest = rospy.Time(0)
         self.currentPoseStamped.header.stamp = latest
         try:
-            self.currentPoseStamped = self.listener.transformPose("/map", self.currentPoseStamped)
+            self.currentPoseStamped = self.listener.transformPose(
+                "/map", self.currentPoseStamped)
         except (tf.LookupException, tf.ConnectivityException,
-            tf.ExtrapolationException, tf.Exception):
+                tf.ExtrapolationException, tf.Exception):
             return -1
         currentPose = self.currentPoseStamped.pose
         mgoal = self.waypoints[self.current_goal_id]
         return self.pose_distance(mgoal, currentPose)
 
-
     def pose_distance(self, pose1, pose2):
-        return math.sqrt( math.pow((pose1.position.x - pose2.position.x), 2)
-            + math.pow((pose1.position.y - pose2.position.y), 2)
-            + math.pow((pose1.position.z - pose2.position.z), 2)
-        )
+        return math.sqrt(math.pow((pose1.position.x - pose2.position.x), 2)
+                         + math.pow((pose1.position.y - pose2.position.y), 2)
+                         + math.pow((pose1.position.z - pose2.position.z), 2)
+                         )
