@@ -205,7 +205,7 @@ if __name__ == "__main__":
         if UserServer.get_connection_status() and ROBOT_POSESTAMPED is not None:
             tfFlag = False
             try:
-                listener.waitForTransform("/map", "/odom", ROBOT_POSESTAMPED.header.stamp, rospy.Duration(1.0))
+                # listener.waitForTransform("/map", "/odom", ROBOT_POSESTAMPED.header.stamp, rospy.Duration(1.0))
                 ROBOT_POSESTAMPED = listener.transformPose(
                     "/map", ROBOT_POSESTAMPED)
                 tfFlag = True
