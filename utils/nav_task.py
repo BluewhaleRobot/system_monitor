@@ -43,7 +43,7 @@ class NavTask():
         self.move_base = actionlib.SimpleActionClient("move_base",
                                                       MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
-        self.move_base.wait_for_server(rospy.Duration(60))
+        self.move_base.wait_for_server(rospy.Duration(1))
         rospy.loginfo("Connected to move base server")
         rospy.loginfo("Starting navigation test")
         self.currentPoseStamped = None
