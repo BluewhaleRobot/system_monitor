@@ -213,7 +213,7 @@ if __name__ == "__main__":
                     "/map", "/odom", ROBOT_POSESTAMPED.header.stamp)
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception) as e:
                 tfFlag = False
-                print(e)
+                # print(e)
 
             # 将机器人坐标系转换成map坐标系
             currentPose = ROBOT_POSESTAMPED.pose
@@ -298,9 +298,7 @@ if __name__ == "__main__":
             data = "xq"
             # 发送广播包
             try:
-                print("boradcast0")
                 s.sendto(data, ('<broadcast>', BROADCAST_PORT))
-                print("boradcast1")
             except:
                 continue
             # clear data
