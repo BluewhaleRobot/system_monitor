@@ -159,10 +159,13 @@ class NavTask():
         goal.target_pose.header.frame_id = 'map'
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose = self.waypoints[goal_id]
-
         def done_cb(status, result):
             self.goal_status = "FREE"
-
+        # wait for 1s
+        if not self.move_base.wait_for_server(rospy.Duration(1)):
+            self.goal_status = "ERROR"
+            self.cancel_goal()
+            return
         self.move_base.send_goal(goal, done_cb=done_cb)
         self.goal_status = "WORKING"
 
