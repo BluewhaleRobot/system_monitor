@@ -26,6 +26,7 @@ from utils.req_parser import ReqParser
 from utils.monitor_servers import UserSer
 from utils.config import BROADCAST_PORT
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
+from utils.config import TF_ROT,TF_TRANS
 
 ROBOT_STATUS = Status()
 ROBOT_STATUS.brightness = 0.0
@@ -52,9 +53,6 @@ SEND_DATA = bytearray(
 
 CONTROL_FLAG = False
 
-TF_ROT = np.array([[0., 0.03818382, 0.99927073],
-                   [-1., 0., 0.], [0., -0.99927073, 0.03818382]])
-TF_TRANS = np.array([0.0, 0.0, 0.])
 TILT_PUB = None
 NAV_LASTTIME = None
 

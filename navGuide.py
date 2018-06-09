@@ -23,11 +23,10 @@ from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import Int32, Bool
 import tf
+from utils.config import TF_ROT,TF_TRANS
 
-scale = 1.05
-tf_rot = np.array([[0., 0.03818382, 0.99927073],
-                   [-1., 0., 0.], [0., -0.99927073, 0.03818382]])
-tf_trans = np.array([0.0, 0.0, 0.])
+tf_rot = TF_ROT
+tf_trans = TF_TRANS
 
 NAV_POINTS_FILE = "/home/xiaoqiang/slamdb/nav.csv"
 currentPose = Pose()
@@ -104,7 +103,7 @@ def dealCarStatus2(moveBaseStatu):
 class MoveBaseSquare:
 
     def __init__(self):
-        global tf_trans, tf_rot, scale, poseFlag, currentPose, currentPoseStamped
+        global tf_trans, tf_rot, poseFlag, currentPose, currentPoseStamped
 
         rospy.init_node('nav_guide', anonymous=False)
 
@@ -130,19 +129,6 @@ class MoveBaseSquare:
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
 
-        # load scale value from scale.txt
-        # file_path=os.path.split(os.path.realpath(__file__))[0]
-        # fp3=open("%s/scale.txt"%(file_path),'r+')
-        fp3 = open("/home/xiaoqiang/slamdb/scale.txt", 'r+')
-        for line in fp3:
-            value_list = line.split(" ")
-        scale = float(value_list[0])
-        if scale <= 0.000001:
-            scale = 1.05
-        rospy.set_param('/orb2base_scale', scale)
-        fp3.close
-        print "scale: " + str(scale)
-
         # Create a list to hold the waypoint poses
         # 创建一个列表存储导航点的位置
         waypoints = list()
@@ -151,22 +137,9 @@ class MoveBaseSquare:
         # is a pose consisting of a position and orientation in the map frame.
         # 创建四个导航点的位置（角度和坐标位置）
         for point in targetPoints:
-
-            # Tad=np.array(point[0],0.0, point[1])
-            # M=tf.transformations.quaternion_matrix(q)
-            # Rad=M[:3,:3]
-            # #为了简化计算，下文的计算中base_link 和base_footprint被看成是相同的坐标系
-            # #转到odom_combined，得到camera在odom_combined中的pose
-            # Rbd=tf_rot.dot(Rad)
-            # Tbd=scale*(tf_rot.dot(Tad))+tf_trans
-            # #由camera 的 pose 得到 base_footprint 的pose，这也是下文要发布的pose
-            # Rdc=tf_rot.T
-            # Tdc=-1/scale*(Rdc.dot(tf_trans))
-            # Rbc=Rbd.dot(Rdc)
-            # Tbc=scale*(Rbd.dot(Tdc))+Tbd
-
-            Tad = np.array([point[0], point[1], point[2]])
-            Tbc = scale * (tf_rot.dot(Tad)) + tf_trans
+            #站点坐标是车体坐标
+            Tac = np.array([point[0], point[1], point[2]])
+            Tbc = tf_rot.dot(Tac) + tf_trans
             waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
         # Initialize the visualization markers for RViz
         # 初始化可视化标记

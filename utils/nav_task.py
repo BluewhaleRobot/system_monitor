@@ -26,7 +26,7 @@ from visualization_msgs.msg import Marker
 import math
 from math import radians, pi
 import numpy as np
-
+from config import TF_ROT,TF_TRANS
 
 class NavTask():
 
@@ -34,9 +34,8 @@ class NavTask():
 
     def __init__(self, NAV_POINTS_FILE="/home/xiaoqiang/slamdb/nav.csv"):
         self.NAV_POINTS_FILE = NAV_POINTS_FILE
-        self.tf_rot = np.array([[0., 0.03818382, 0.99927073],
-                                [-1., 0., 0.], [0., -0.99927073, 0.03818382]])
-        self.tf_trans = np.array([0.0, 0.0, 0.])
+        self.tf_rot = TF_ROT
+        self.tf_trans = TF_TRANS
         self.load_targets()
         self.init_markers()
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
@@ -86,19 +85,10 @@ class NavTask():
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
 
-        value_list = []
-        with open("/home/xiaoqiang/slamdb/scale.txt", "r+") as scale_file:
-            for line in scale_file:
-                value_list = line.split(" ")
-        scale = float(value_list[0])
-        if scale <= 0.000001:
-            scale = 5.
-        rospy.set_param('/orb2base_scale', scale)
-        print("scale: " + str(scale))
         self.waypoints = list()
         for point in self.target_points:
-            Tad = np.array([point[0], point[1], point[2]])
-            Tbc = scale * (self.tf_rot.dot(Tad)) + self.tf_trans
+            Tac = np.array([point[0], point[1], point[2]])
+            Tbc = self.tf_rot.dot(Tac) + self.tf_trans
             self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
 
     def init_markers(self):
