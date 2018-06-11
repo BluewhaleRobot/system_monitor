@@ -166,9 +166,9 @@ class UserSer(threading.Thread):
                         if not self.MAP_THREAD.stopped():
                             print "关闭视觉2"
                             self.MAP_THREAD.stop()
-                        os.system("pkill -f odom2map.py")
+                        os.system("pkill -f getORBtrack.py")
                         os.system("pkill -f navGuide.py")
-                        os.system("pkill -f ORB_SALM")
+                        os.system("pkill -f ORB_SLAM")
                         os.system("pkill -f map_server")
                         os.system("pkill -f move_base")
                         os.system("pkill -f odom_map_broadcaster")
@@ -254,7 +254,7 @@ class UserSer(threading.Thread):
                         self.SPEED_CMD.angular.z = 0
                         self.CMD_VEL_PUB.publish(self.SPEED_CMD)
                         self.NAV_FLAG = False
-                        os.system("pkill -f odom2map.py")
+                        os.system("pkill -f getORBtrack.py")
                         os.system("pkill -f navGuide.py")
                         os.system("pkill -f ORB_SLAM")
                         os.system("pkill -f map_server")

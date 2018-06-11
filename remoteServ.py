@@ -146,7 +146,7 @@ def init_sub_pubs():
     NAV_LASTTIME = rospy.Time.now()
     rospy.Subscriber("/xqserial_server/Power", Float64, get_power)
     rospy.Subscriber("/usb_cam/image_raw", Image, get_image)
-    rospy.Subscriber("/xqserial_server/Odom", Odometry, get_odom)
+    rospy.Subscriber("/bWmono/Odom", Odometry, get_odom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, get_orb_tracking_flag)
     rospy.Subscriber("/ORB_SLAM/Frame", Image, get_orb_start_status)
     rospy.Subscriber("/ORB_SLAM/GC", Bool, get_orbgc_status)
@@ -185,6 +185,8 @@ if __name__ == "__main__":
     heart_beat_count = 40  # 每4秒心跳维护一次
     play_sound_cmd = "aplay /home/xiaoqiang/Desktop/d.wav"
     listener = tf.TransformListener(True, rospy.Duration(10.0))
+    Tac = np.array([0., 0., 0.])
+    theta_send = 0.
     while not rospy.is_shutdown():
         # #每２秒提示一下
         # if heart_beat_count==10:
@@ -200,50 +202,29 @@ if __name__ == "__main__":
             CONTROL_FLAG = False
         heart_beat_count += 1
         # 持续反馈状态
-        if UserServer.get_connection_status() and ROBOT_POSESTAMPED is not None:
-            tfFlag = False
-            try:
-                # listener.waitForTransform("/map", "/odom", ROBOT_POSESTAMPED.header.stamp, rospy.Duration(1.0))
-                ROBOT_POSESTAMPED = listener.transformPose(
-                    "/map", ROBOT_POSESTAMPED)
-                tfFlag = True
-                (Thf, Qhf) = listener.lookupTransform(
-                    "/map", "/odom", ROBOT_POSESTAMPED.header.stamp)
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception) as e:
-                tfFlag = False
-                # print(e)
+        if UserServer.get_connection_status():
+            if ROBOT_STATUS.odomStatus and ROBOT_POSESTAMPED is not None:
+                # 将map坐标系转换成ORB_SLAM/World坐标系
+                currentPose = ROBOT_POSESTAMPED.pose
+                Tbc = np.array(
+                    [currentPose.position.x, currentPose.position.y, currentPose.position.z])
+                q = [currentPose.orientation.x, currentPose.orientation.y,
+                     currentPose.orientation.z, currentPose.orientation.w]
+                M = tf.transformations.quaternion_matrix(q)
+                Rbc = M[:3, :3]
 
-            # 将机器人坐标系转换成map坐标系
-            currentPose = ROBOT_POSESTAMPED.pose
-            Tbc = np.array(
-                [currentPose.position.x, currentPose.position.y, currentPose.position.z])
-            q = [currentPose.orientation.x, currentPose.orientation.y,
-                 currentPose.orientation.z, currentPose.orientation.w]
-            M = tf.transformations.quaternion_matrix(q)
-            Rbc = M[:3, :3]
-            if not tfFlag:
-                M = tf.transformations.quaternion_matrix(Qhf)
-                Rhf = M[:3, :3]
-                Rbc = Rhf.dot(Rbc)
-                Tbc = Rhf.dot(Tbc) + Thf
+                ax, ay, theta_send = tf.transformations.euler_from_matrix(Rbc)
+                # 为了简化计算，下文的计算中 base_link 和 base_footprint 被看成是相同的坐标系
 
-            ax, ay, theta_send = tf.transformations.euler_from_matrix(Rbc)
-            # 为了简化计算，下文的计算中 base_link 和 base_footprint 被看成是相同的坐标系
-            #Rbd = Rbc.dot(TF_ROT)
-            #Tbd = Rbc.dot(TF_TRANS) + Tbc
+                Rab = TF_ROT.T
+                Tab = -Rab.dot(TF_TRANS)
 
-            Rab = TF_ROT.T
-            Tab = -Rab.dot(TF_TRANS)
+                Rac = Rab.dot(Rbc)
+                Tac = Rab.dot(Tbc) + Tab
 
-            #Rad = Rab.dot(Rbd)
-            #Tad = Rab.dot(Tbd)+Tab
-
-            Rad = Rab.dot(Rbc)
-            Tad = Rab.dot(Tbc) + Tab
-
-            SEND_DATA[4:8] = map(ord, struct.pack('f', Tad[0]))
-            SEND_DATA[8:12] = map(ord, struct.pack('f', Tad[1]))
-            SEND_DATA[12:16] = map(ord, struct.pack('f', Tad[2]))
+            SEND_DATA[4:8] = map(ord, struct.pack('f', Tac[0]))
+            SEND_DATA[8:12] = map(ord, struct.pack('f', Tac[1]))
+            SEND_DATA[12:16] = map(ord, struct.pack('f', Tac[2]))
             SEND_DATA[16:20] = map(ord, struct.pack('f', ROBOT_STATUS.power))
             SEND_DATA[24:28] = map(ord, struct.pack('f', theta_send))
             if UserServer.nav_task == None:
