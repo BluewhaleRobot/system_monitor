@@ -115,7 +115,7 @@ def cameraOdom(campose):
 
 
 def doSecurity():
-    global mStatusLock
+    global mStatusLock,carUpdateFlag,camUpdateFlag
     global cam_currentTime, car_currentTime
     global globalMovePub, velPub
     global navFlag_pub, enableMoveFlag,barFlag
