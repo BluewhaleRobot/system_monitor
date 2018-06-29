@@ -140,7 +140,7 @@ class NavTask():
         if self.current_goal_status() != "FREE":
             self.cancel_goal()
         # invalid goal id
-        if goal_id > len(self.waypoints):
+        if goal_id >= len(self.waypoints):
             self.goal_status = "ERROR"
             return
         self.current_goal_id = goal_id
