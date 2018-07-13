@@ -197,8 +197,8 @@ class MonitorServer(threading.Thread):
                         mapSaveFlag = Bool()
                         mapSaveFlag.data = True
                         self.map_save_pub.publish(mapSaveFlag)
-                        if self.map_thread.SCALE_ORB_THREAD != None:
-                            self.map_thread.SCALE_ORB_THREAD.saveScale()
+                        if self.map_thread.scale_orb_thread != None:
+                            self.map_thread.scale_orb_thread.saveScale()
                     elif cmds[count][1] == 3:
                         rospy.loginfo("更新地图")
                         if self.map_thread.stopped():
