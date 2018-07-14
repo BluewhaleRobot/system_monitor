@@ -186,7 +186,7 @@ class MonitorServer(threading.Thread):
                         if not self.map_thread.stopped():
                             rospy.loginfo("关闭视觉2")
                             self.map_thread.stop()
-                        os.system("pkill -f getORBtrack.py")
+                        os.system("pkill -f orb_track.py.py")
                         os.system("pkill -f navGuide.py")
                         os.system("pkill -f ORB_SLAM")
                         os.system("pkill -f map_server")
@@ -274,7 +274,7 @@ class MonitorServer(threading.Thread):
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
                         self.nav_flag = False
-                        os.system("pkill -f getORBtrack.py")
+                        os.system("pkill -f orb_track.py.py")
                         os.system("pkill -f navGuide.py")
                         os.system("pkill -f ORB_SLAM")
                         os.system("pkill -f map_server")
