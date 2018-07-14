@@ -25,22 +25,31 @@
 # Author: Randoms, Xiefusheng
 #
 
-import numpy as np
 
-HOST = ''  # should not be 127.0.0.1 or localhost
-USERSOCKET_PORT = 20001  # 局域网udp命令监听端口
-BROADCAST_PORT = 22001
+import os
+import signal
+import threading
+import time
 
-MAX_VEL = 1.3
-MAX_THETA = 3.0
-POWER_LOW = 30.0
+TIMEOUT = 5
 
-TF_ROT = np.array([[0., 0., 1.],
-                   [-1., 0., 0.], [0., -1., 0.]])
-TF_TRANS = np.array([0.33, 0.0, 0.])
-<<<<<<< HEAD
-=======
-ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
-    '/opt/ros/kinetic/stacks:' + \
-    '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
->>>>>>> 49b32313d771db59aa1c3097a90043368feb022f
+
+def stop_process(target_process):
+    if target_process.poll() is None:
+        target_process.send_signal(signal.SIGINT)
+        thread1 = threading.Thread(target=target_process.wait, args=())
+        thread1.start()
+
+    timecount = 0
+    while timecount < TIMEOUT:
+        timecount += 1
+        time.sleep(1)
+        try:
+            os.killpg(target_process.pid, 0)
+        except Exception:
+            break
+
+    if timecount >= TIMEOUT and target_process.poll() is None:
+        os.killpg(target_process.pid, signal.SIGKILL)
+        target_process.terminate()
+        target_process.wait()
