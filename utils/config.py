@@ -38,9 +38,7 @@ POWER_LOW = 30.0
 TF_ROT = np.array([[0., 0., 1.],
                    [-1., 0., 0.], [0., -1., 0.]])
 TF_TRANS = np.array([0.33, 0.0, 0.])
-<<<<<<< HEAD
-=======
+
 ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
     '/opt/ros/kinetic/stacks:' + \
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
->>>>>>> 49b32313d771db59aa1c3097a90043368feb022f
