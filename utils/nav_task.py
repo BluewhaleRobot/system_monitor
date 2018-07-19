@@ -196,9 +196,10 @@ class NavigationTask():
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
 
-        Tac = np.array([pos_x, pos_y, pos_z])
-        Tbc = self.tf_rot.dot(Tac) + self.tf_trans
-        self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
+        # Tac = np.array([pos_x, pos_y, pos_z])
+        # Tbc = self.tf_rot.dot(Tac) + self.tf_trans
+        # self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
+        self.waypoints.append(Pose(Point(pos_x, pos_y, pos_z), q))
 
     def reset_goals(self):
         self.current_goal_id = -1
