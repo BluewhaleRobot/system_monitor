@@ -22,46 +22,35 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# Author: Randoms, Xiefusheng
+# Author: Randoms
 #
 
+import json
+from socket import AF_INET, SO_BROADCAST, SOCK_DGRAM, SOL_SOCKET, socket
 
-import os
-import re
-import signal
-import threading
-import time
+import rospy
 
-from config import SHARPLINK_LOG_FILE
+from utils.config import BROADCAST_PORT_V2
+from utils.utils import get_my_id
 
-TIMEOUT = 5
+if __name__ == "__main__":
+    rospy.init_node("broadcast_server")
+    rate = rospy.Rate(10)
+    while not rospy.is_shutdown():
+        # 配置udp广播
+        s = socket(AF_INET, SOCK_DGRAM)
+        s.bind(('', 0))
+        s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
-
-def stop_process(target_process):
-    if target_process.poll() is None:
-        target_process.send_signal(signal.SIGINT)
-        thread1 = threading.Thread(target=target_process.wait, args=())
-        thread1.start()
-
-    timecount = 0
-    while timecount < TIMEOUT:
-        timecount += 1
-        time.sleep(1)
+        data = json.dumps({
+            "id": get_my_id(),
+            "port": 11311,
+        }, indent=4)
+        # 发送广播包
         try:
-            os.killpg(target_process.pid, 0)
-        except Exception:
-            break
-
-    if timecount >= TIMEOUT and target_process.poll() is None:
-        os.killpg(target_process.pid, signal.SIGKILL)
-        target_process.terminate()
-        target_process.wait()
-
-
-def get_my_id(myid=None):
-    log_file = open(SHARPLINK_LOG_FILE)
-    contents = log_file.read()
-    log_file.close()
-    mid_search = re.search(r"[0-9]+,\sID:\s(?P<id>[0-9A-F]{76})", contents)
-    mid = mid_search.group("id")
-    return mid
+            s.sendto(data, ('<broadcast>', BROADCAST_PORT_V2))
+            print("Send success")
+        except Exception as e:
+            print(e)
+            continue
+        rate.sleep()
