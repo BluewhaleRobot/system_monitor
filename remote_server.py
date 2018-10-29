@@ -339,6 +339,9 @@ if __name__ == "__main__":
             galileo_status.currentSpeedX = ROBOT_REAL_TWIST.twist.linear.x
             galileo_status.currentSpeedTheta = ROBOT_REAL_TWIST.twist.angular.z
         galileo_status.chargeStatus = CHARGE_STATUS.data
+        if galileo_status.header.stamp == rospy.Time(0):
+            galileo_status.header.stamp = rospy.Time.now()
+
         pubs["GALILEO_STATUS_PUB"].publish(galileo_status)
 
         broadcast_count += 1

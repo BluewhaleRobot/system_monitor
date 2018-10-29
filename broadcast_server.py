@@ -27,6 +27,7 @@
 
 import json
 from socket import AF_INET, SO_BROADCAST, SOCK_DGRAM, SOL_SOCKET, socket
+from getmac import get_mac_address
 
 import rospy
 
@@ -45,11 +46,11 @@ if __name__ == "__main__":
         data = json.dumps({
             "id": get_my_id(),
             "port": 11311,
+            "mac": get_mac_address(),
         }, indent=4)
         # 发送广播包
         try:
             s.sendto(data, ('<broadcast>', BROADCAST_PORT_V2))
-            print("Send success")
         except Exception as e:
             print(e)
             continue
