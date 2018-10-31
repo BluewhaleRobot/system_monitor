@@ -151,6 +151,7 @@ class NavigationTask():
         if self.current_goal_status() != "FREE":
             self.move_base.cancel_goal()
             self.cmd_vel_pub.publish(Twist())
+        self.current_goal_id = -1
         self.goal_status = "FREE"
 
     """
