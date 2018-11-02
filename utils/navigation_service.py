@@ -50,6 +50,14 @@ class NavigationService(threading.Thread):
 
     def stop(self):
         if self.p != None:
+            if self.speed == 1:
+                os.system("pkill -f tank_blank_map1.launch")
+            elif self.speed == 2:
+                os.system("pkill -f tank_blank_map2.launch")
+            elif self.speed == 3:
+                os.system("pkill -f tank_blank_map3.launch")
+            elif self.speed == 0:
+                os.system("pkill -f tank_blank_map0.launch")
             self.ps_process = psutil.Process(pid=self.p.pid)
             for child in self.ps_process.children(recursive=True):
                 child.kill()
