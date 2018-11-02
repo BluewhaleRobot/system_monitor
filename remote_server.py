@@ -63,7 +63,8 @@ SEND_DATA = bytearray(
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00,])
 
 CONTROL_FLAG = False
 
@@ -239,6 +240,7 @@ if __name__ == "__main__":
             if monitor_server.nav_task == None:
                 SEND_DATA[28:32] = map(ord, struct.pack('i', 3))
                 SEND_DATA[32:36] = map(ord, struct.pack('i', -1))
+                SEND_DATA[40:44] = map(ord, struct.pack('i', 0))
             else:
                 if monitor_server.nav_task.current_goal_status() == "FREE":
                     SEND_DATA[28:32] = map(ord, struct.pack('i', 0))
@@ -251,6 +253,7 @@ if __name__ == "__main__":
                     SEND_DATA[28:32] = map(ord, struct.pack('i', 2))
                     SEND_DATA[32:36] = map(ord, struct.pack('i',
                                                             monitor_server.nav_task.current_goal_id))
+                SEND_DATA[40:44] = map(ord, struct.pack('i', monitor_server.nav_task.loop_running_flag))
             SEND_DATA[36:40] = map(ord, struct.pack('i', CHARGE_STATUS.data))
 
             if monitor_server.nav_task != None:
@@ -302,6 +305,7 @@ if __name__ == "__main__":
 
         # 发布状态topic
         galileo_status = GalileoStatus()
+        galileo_status.loopStatus = 0
         if ROBOT_POSESTAMPED is not None:
             galileo_status.header = ROBOT_POSESTAMPED.header
         galileo_status.navStatus = 0
@@ -317,6 +321,7 @@ if __name__ == "__main__":
         galileo_status.targetNumID = -1
         if monitor_server.nav_task != None:
             galileo_status.targetNumID = monitor_server.nav_task.current_goal_id
+            galileo_status.loopStatus = monitor_server.nav_task.loop_running_flag
         galileo_status.targetStatus = 0
         if monitor_server.nav_task != None:
             if monitor_server.nav_task.current_goal_status() == "FREE":

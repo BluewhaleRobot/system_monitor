@@ -62,6 +62,7 @@ class NavigationTask():
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.loop_running_flag = False
+        self.sleep_time = 1
 
         def get_odom(odom):
             with self.status_lock:
@@ -310,7 +311,7 @@ class NavigationTask():
                 time.sleep(1)
             next_index += 1
             next_index = next_index % len(self.waypoints)
-            time.sleep(1)
+            time.sleep(self.sleep_time)
             
 
     def start_loop(self):
