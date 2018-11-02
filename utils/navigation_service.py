@@ -50,10 +50,13 @@ class NavigationService(threading.Thread):
 
     def stop(self):
         if self.p != None:
-            self.ps_process = psutil.Process(pid=self.p.pid)
-            for child in self.ps_process.children(recursive=True):
-                child.kill()
-            self.ps_process.kill()
+            try:
+                self.ps_process = psutil.Process(pid=self.p.pid)
+                for child in self.ps_process.children(recursive=True):
+                    child.kill()
+                self.ps_process.kill()
+            except Exception:
+                pass
         self.p = None
         self._stop.set()
         self.__init__(self.robot_status_lock, self.robot_status)

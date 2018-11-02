@@ -45,6 +45,7 @@ from system_monitor.msg import Status
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
 from map_service import MapService
 from nav_task import NavigationTask
+from nav_guide_server import NavGuideServer
 from navigation_service import NavigationService
 from req_parser import ReqParser
 from utils import stop_process
@@ -79,6 +80,7 @@ class MonitorServer(threading.Thread):
         self.user_socket_remote = None
 
         self.nav_task = None
+        self.nav_guide_task = None
         rospy.loginfo("service started")
 
         def get_galileo_cmds(cmds):
@@ -280,6 +282,23 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f map_server")
                         os.system("pkill -f move_base")
                         os.system("pkill -f odom_map_broadcaster")
+                    if cmds[count][1] == 5:
+                        rospy.loginfo("开启自动巡检")
+                        tilt_degree = Int16()
+                        tilt_degree.data = -19
+                        self.tilt_pub.publish(tilt_degree)
+                        if self.nav_thread.stopped():
+                            rospy.logwarn("巡检状态未启动")
+                            return
+                        if self.nav_task.loop_running_flag:
+                            rospy.logwarn("已经开始巡检")
+                            return
+                        self.nav_task.start_loop()
+                    if cmds[count][1] == 6:
+                        rospy.loginfo("停止自动巡检")
+                        if self.nav_task is not None:
+                            self.nav_task.stop_loop()
+
                 elif cmds[count][0] == ord('g'):
                     self.nav_task.set_goal(cmds[count][1])
                 elif cmds[count][0] == ord('i'):
