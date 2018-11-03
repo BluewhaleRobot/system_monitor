@@ -37,7 +37,7 @@ from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion, Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32
-from tf.transformations import quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 from config import TF_ROT, TF_TRANS
 
@@ -61,6 +61,8 @@ class NavigationTask():
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.current_goal_id = -1
         self.goal_status = "FREE"
+        self.loop_running_flag = False
+        self.sleep_time = 1
 
         def get_odom(odom):
             with self.status_lock:
@@ -104,6 +106,7 @@ class NavigationTask():
 
     def shutdown(self):
         rospy.loginfo("Stopping the robot...")
+        self.stop_loop()
         # Cancel any active goals
         if self.move_base != None:
             self.move_base.cancel_goal()
@@ -151,6 +154,7 @@ class NavigationTask():
         if self.current_goal_status() != "FREE":
             self.move_base.cancel_goal()
             self.cmd_vel_pub.publish(Twist())
+        self.current_goal_id = -1
         self.goal_status = "FREE"
 
     """
@@ -190,18 +194,130 @@ class NavigationTask():
                          + math.pow((pose1.position.z - pose2.position.z), 2)
                          )
 
+    # 插入点坐标为map坐标系下
     def insert_goal(self, pos_x, pos_y, pos_z):
         # 插入一个新点
-        self.target_points.append([pos_x, pos_y, pos_z])
+        # target_points在ORB_SLAM/World坐标系下
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
+        waypoint = Pose(Point(pos_x, pos_y, pos_z), q)
+        self.waypoints.append(waypoint)
+        waypoint_stamped = PoseStamped()
+        waypoint_stamped.header.frame_id = "map"
+        waypoint_stamped.header.stamp = rospy.Time.now()
+        waypoint_stamped.pose = waypoint
 
-        Tac = np.array([pos_x, pos_y, pos_z])
-        Tbc = self.tf_rot.dot(Tac) + self.tf_trans
-        self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
-        # self.waypoints.append(Pose(Point(pos_x, pos_y, pos_z), q))
+        # 转至ORB_SLAM/World坐标系
+        rospy.loginfo("获取TF map->ORB_SLAM/World")
+        tf_flag = False
+        while not tf_flag and not rospy.is_shutdown():
+            try:
+                now = rospy.Time.now()
+                self.listener.waitForTransform("map", "ORB_SLAM/World", now,
+                                               rospy.Duration(1.0))
+                tf_flag = True
+            except (tf.LookupException, tf.ConnectivityException,
+                    tf.ExtrapolationException, tf.Exception) as e:
+                tf_flag = False
+                rospy.logwarn("获取TF失败 map->ORB_SLAM/World")
+                rospy.logwarn(e)
+        rospy.loginfo("获取TF 成功 map->ORB_SLAM/World")
+        target_point = self.listener.transformPose(
+            "ORB_SLAM/World", waypoint_stamped)
+        self.target_points.append(target_point)
+
 
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.load_targets()
+
+    def loop_task(self):
+        # 获取当前最近的位置
+        rospy.loginfo("获取TF")
+        tf_flag = False
+        self.listener = tf.TransformListener(True, rospy.Duration(10.0))
+        while not tf_flag and not rospy.is_shutdown():
+            try:
+                now = rospy.Time.now()
+                self.listener.waitForTransform("map", "odom", now,
+                                               rospy.Duration(1.0))
+                tf_flag = True
+            except (tf.LookupException, tf.ConnectivityException,
+                    tf.ExtrapolationException, tf.Exception) as e:
+                tf_flag = False
+                rospy.logwarn("获取TF失败")
+                rospy.logwarn(e)
+        rospy.loginfo("获取TF 成功")
+        self.current_pose_stamped.header.stamp = now
+        if not tf_flag:
+            return
+        with self.status_lock:
+            self.current_pose_stamped = self.listener.transformPose(
+                "/map", self.current_pose_stamped)
+        current_pose = self.current_pose_stamped.pose
+        current_pose_q = [current_pose.orientation.x, current_pose.orientation.y,
+                          current_pose.orientation.z, current_pose.orientation.w]
+        theta_current = euler_from_quaternion(current_pose_q)[2]
+        rospy.loginfo("current_pose: " + str(current_pose))
+        rospy.loginfo("计算发布点")
+        # 找到第一个要走的目标点,在机器人正面且距离最近的点
+        next_target = None
+        mini_distance = 0
+        # waypoints 是在map坐标系的点
+        back_points = [] # 在机器人背后的点
+        for point in self.waypoints:
+            # 判断是否在机器人前方
+            theta_delta = math.atan2(
+                point.position.y - current_pose.position.y, point.position.x - current_pose.position.x)
+            delta_current = abs(theta_delta - theta_current)
+            if delta_current > 3.1415926:
+                delta_current = abs(2 * 3.1415926 - delta_current)
+            
+            rospy.loginfo("delta_current: " + str(delta_current))
+            rospy.loginfo("current pose: " + str(current_pose.position.x) + " " + str(current_pose.position.y))
+            rospy.loginfo("point: " + str(point.position.x) + " " + str(point.position.y))
+            rospy.loginfo("theta_current: " + str(theta_current))
+            rospy.loginfo("theta_delta: " + str(theta_delta))
+            if delta_current > math.pi / 2:
+                back_points.append(point)
+                continue
+            current_distance = self.pose_distance(current_pose, point)
+
+            if current_distance < mini_distance or mini_distance == 0:
+                mini_distance = current_distance
+                next_target = point
+        # 如果正面没有目标点，则选择最近的目标点
+        mini_distance = 0
+        if next_target is None:
+            for point in back_points:
+                current_distance = self.pose_distance(current_pose, point)
+                if current_distance < mini_distance or mini_distance == 0:
+                    mini_distance = current_distance
+                    next_target = point
+
+        next_index = self.waypoints.index(next_target)
+        while not rospy.is_shutdown() and self.loop_running_flag:
+            time.sleep(1)
+            rospy.loginfo("next goal " + str(next_index))
+            self.set_goal(next_index)
+            # 等待goal的状态
+            time.sleep(1)
+            while not rospy.is_shutdown():
+                if self.goal_status == "FREE" and \
+                        self.current_goal_distance() < 0.2 and \
+                        self.current_goal_distance() > 0:
+                    break
+                time.sleep(1)
+            next_index += 1
+            next_index = next_index % len(self.waypoints)
+            time.sleep(self.sleep_time)
+            
+
+    def start_loop(self):
+        self.loop_running_flag = True
+        threading._start_new_thread(self.loop_task, ())
+
+    def stop_loop(self):
+        self.loop_running_flag = False
+
