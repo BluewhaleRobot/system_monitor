@@ -45,7 +45,6 @@ from system_monitor.msg import Status
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
 from map_service import MapService
 from nav_task import NavigationTask
-from nav_guide_server import NavGuideServer
 from navigation_service import NavigationService
 from req_parser import ReqParser
 from utils import stop_process
@@ -188,12 +187,8 @@ class MonitorServer(threading.Thread):
                         if not self.map_thread.stopped():
                             rospy.loginfo("关闭视觉2")
                             self.map_thread.stop()
-                        os.system("pkill -f orb_track.py")
-                        os.system("pkill -f navGuide.py")
-                        os.system("pkill -f ORB_SLAM")
-                        os.system("pkill -f map_server")
-                        os.system("pkill -f move_base")
-                        os.system("pkill -f odom_map_broadcaster")
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
                     elif cmds[count][1] == 2:
                         rospy.loginfo("保存地图")
                         mapSaveFlag = Bool()
@@ -276,12 +271,10 @@ class MonitorServer(threading.Thread):
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
                         self.nav_flag = False
-                        os.system("pkill -f orb_track.py")
-                        os.system("pkill -f navGuide.py")
-                        os.system("pkill -f ORB_SLAM")
-                        os.system("pkill -f map_server")
-                        os.system("pkill -f move_base")
-                        os.system("pkill -f odom_map_broadcaster")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map0.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map1.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
                     if cmds[count][1] == 5:
                         rospy.loginfo("开启自动巡检")
                         tilt_degree = Int16()
