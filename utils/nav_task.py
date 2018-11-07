@@ -62,6 +62,7 @@ class NavigationTask():
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.loop_running_flag = False
+        self.loop_exited_flag = True
         self.sleep_time = 1
 
         def get_odom(odom):
@@ -234,6 +235,7 @@ class NavigationTask():
 
     def loop_task(self):
         # 获取当前最近的位置
+        self.loop_exited_flag = False
         rospy.loginfo("获取TF")
         tf_flag = False
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
@@ -298,7 +300,6 @@ class NavigationTask():
 
         next_index = self.waypoints.index(next_target)
         while not rospy.is_shutdown() and self.loop_running_flag:
-            time.sleep(1)
             rospy.loginfo("next goal " + str(next_index))
             self.set_goal(next_index)
             # 等待goal的状态
@@ -308,15 +309,26 @@ class NavigationTask():
                         self.current_goal_distance() < 0.2 and \
                         self.current_goal_distance() > 0:
                     break
-                time.sleep(1)
+                if not self.loop_running_flag:
+                    self.loop_exited_flag = True
+                    return
+                time.sleep(0.5)
             next_index += 1
             next_index = next_index % len(self.waypoints)
-            time.sleep(self.sleep_time)
+            sleep_count = 0
+            while sleep_count < self.sleep_time:
+                time.sleep(0.01)
+                sleep_count += 0.01
+                if not self.loop_running_flag:
+                    self.loop_exited_flag = True
+                    return
+        self.loop_exited_flag = True
             
 
     def start_loop(self):
         self.loop_running_flag = True
-        threading._start_new_thread(self.loop_task, ())
+        if self.loop_exited_flag:
+            threading._start_new_thread(self.loop_task, ())
 
     def stop_loop(self):
         self.loop_running_flag = False
