@@ -27,9 +27,12 @@
 
 
 import os
+import re
 import signal
 import threading
 import time
+
+from config import SHARPLINK_LOG_FILE
 
 TIMEOUT = 5
 
@@ -53,3 +56,12 @@ def stop_process(target_process):
         os.killpg(target_process.pid, signal.SIGKILL)
         target_process.terminate()
         target_process.wait()
+
+
+def get_my_id(myid=None):
+    log_file = open(SHARPLINK_LOG_FILE)
+    contents = log_file.read()
+    log_file.close()
+    mid_search = re.search(r"[0-9]+,\sID:\s(?P<id>[0-9A-F]{76})", contents)
+    mid = mid_search.group("id")
+    return mid

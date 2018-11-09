@@ -30,6 +30,7 @@ This is a system monitor node for xiaoqiang. Monitor items are power, odom, brig
 System status will be published at /system_monitor/report
 '''
 
+import json
 import threading
 
 import rospy
@@ -37,6 +38,7 @@ from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, UInt32
 from system_monitor.msg import Status
+from xiaoqiang_log.msg import LogRecord
 
 from utils.config import POWER_LOW
 
@@ -125,9 +127,22 @@ def monitor():
 if __name__ == "__main__":
     monitor()
     rate = rospy.Rate(1)
+    log_count = 0
+    log_pub = rospy.Publisher("/xiaoqiang_log", LogRecord, queue_size=0)
 
     while not rospy.is_shutdown():
         STATUS_LOCK.acquire()
+        log_count += 1
+        # 每1min记录一次电压
+        if log_count == 60:
+            log_count = 1
+            log_record = LogRecord()
+            log_record.stamp = rospy.Time.now()
+            log_record.collection_name = "power"
+            log_record.record = json.dumps({
+                "power": ROBOT_STATUS.power
+            }, indent=4)
+            log_pub.publish(log_record)
         if REPORT_PUB != "":
             REPORT_PUB.publish(ROBOT_STATUS)
         # clear data

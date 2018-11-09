@@ -189,7 +189,7 @@ def init():
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, camera_odom)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, car_odom)
     rospy.Subscriber("/xqserial_server/StatusFlag", Int32, deal_car_status)
-    GLOBAL_MOVE_PUB = rospy.Publisher('/globalMoveFlag', Bool, queue_size=1)
+    GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
     NAV_FLAG_PUB = rospy.Publisher('/nav_setStop', Bool, queue_size=0)
     VEL_PUB = rospy.Publisher('/cmd_vel', Twist, queue_size=5)
 

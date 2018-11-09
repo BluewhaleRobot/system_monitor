@@ -22,25 +22,36 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# Author: Randoms, Xiefusheng
+# Author: Randoms
 #
 
-import numpy as np
+import json
+from socket import AF_INET, SO_BROADCAST, SOCK_DGRAM, SOL_SOCKET, socket
+from getmac import get_mac_address
+
 import rospy
 
-HOST = ''  # should not be 127.0.0.1 or localhost
-USERSOCKET_PORT = 20001  # 局域网udp命令监听端口
-BROADCAST_PORT = 22001 # 局域网广播端口
-BROADCAST_PORT_V2 = 22002 # 局域网广播端口V2版本
+from utils.config import BROADCAST_PORT_V2
+from utils.utils import get_my_id
 
-MAX_VEL = 1.3
-MAX_THETA = 3.0
-POWER_LOW = 9.8
+if __name__ == "__main__":
+    rospy.init_node("broadcast_server")
+    rate = rospy.Rate(10)
+    while not rospy.is_shutdown():
+        # 配置udp广播
+        s = socket(AF_INET, SOCK_DGRAM)
+        s.bind(('', 0))
+        s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
-TF_ROT = np.array([[0., -0.0302326, 0.99954289],
-                   [-1., 0., 0.], [0., -0.99954289, -0.0302326]])
-TF_TRANS = np.array([0.30, 0.0, 0.])
-ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
-    '/opt/ros/kinetic/stacks:' + \
-    '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
-SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.log"
+        data = json.dumps({
+            "id": get_my_id(),
+            "port": 11311,
+            "mac": get_mac_address(),
+        }, indent=4)
+        # 发送广播包
+        try:
+            s.sendto(data, ('<broadcast>', BROADCAST_PORT_V2))
+        except Exception as e:
+            print(e)
+            continue
+        rate.sleep()
