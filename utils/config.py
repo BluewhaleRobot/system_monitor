@@ -37,8 +37,8 @@ MAX_VEL = 1.3
 MAX_THETA = 2.5
 POWER_LOW = 9.8
 
-TF_ROT = np.array([[0., 0.0238022, 0.99971669],
-                   [-1., 0., 0.], [0., -0.99971669, 0.0238022]])
+TF_ROT = np.array([[0., 0.01845204, 0.99982975],
+                   [-1., 0., 0.], [0., -0.99982975, 0.01845204]])
 TF_TRANS = np.array([0.33, 0.07, 0.])
 ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
     '/opt/ros/kinetic/stacks:' + \
