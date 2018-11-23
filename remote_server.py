@@ -343,6 +343,18 @@ if __name__ == "__main__":
             galileo_status.controlSpeedTheta = ROBOT_CONTROL_TWIST.angular.z
             galileo_status.currentSpeedX = ROBOT_REAL_TWIST.twist.linear.x
             galileo_status.currentSpeedTheta = ROBOT_REAL_TWIST.twist.angular.z
+        if monitor_server.map_thread.stopped():
+            galileo_status.mapStatus = 0
+        else:
+            galileo_status.mapStatus = 1
+        if ROBOT_STATUS.orbGCFlag:
+            galileo_status.gcStatus = 1
+        else:
+            galileo_status.gcStatus = 0
+        if ROBOT_STATUS.orbGBAFlag:
+            galileo_status.gbaStatus = 1
+        else:
+            galileo_status.gbaStatus = 0
         galileo_status.chargeStatus = CHARGE_STATUS.data
         if galileo_status.header.stamp == rospy.Time(0):
             galileo_status.header.stamp = rospy.Time.now()
