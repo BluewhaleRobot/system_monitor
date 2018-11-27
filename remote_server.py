@@ -285,38 +285,20 @@ if __name__ == "__main__":
         SEND_DATA[3] = len(SEND_DATA) - 4
         monitor_server.sendto(bytes(SEND_DATA))
 
-        # 每秒广播一次
-        if broadcast_count == 10:
-            broadcast_count = 0
-            data = "xq"
-            # 发送广播包
-            try:
-                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
-            except:
-                continue
-            # clear data
-            ROBOT_STATUS.power = 0.0
-            ROBOT_STATUS.orbInitStatus = False
-            ROBOT_STATUS.orbStartStatus = False
-            ROBOT_STATUS.imageStatus = False
-            ROBOT_STATUS.odomStatus = False
-            ROBOT_STATUS.orbGCFlag = False
-            ROBOT_STATUS.orbGBAFlag = False
-
         # 发布状态topic
         galileo_status = GalileoStatus()
         galileo_status.loopStatus = 0
         if ROBOT_POSESTAMPED is not None:
             galileo_status.header = ROBOT_POSESTAMPED.header
         galileo_status.navStatus = 0
-        if ROBOT_STATUS.orbInitStatus:
-            galileo_status.visualStatus = 1
-        else:
+        if not ROBOT_STATUS.orbInitStatus:
             galileo_status.visualStatus = 2
-        if monitor_server.nav_task != None:
+        else:
+            galileo_status.visualStatus = 1
+        if monitor_server.nav_task != None: # 导航任务正在运行
             galileo_status.navStatus = 1
         else:
-            galileo_status.visualStatus = 0
+            galileo_status.navStatus = 0
         galileo_status.power = ROBOT_STATUS.power
         galileo_status.targetNumID = -1
         if monitor_server.nav_task != None:
@@ -361,6 +343,22 @@ if __name__ == "__main__":
 
         pubs["GALILEO_STATUS_PUB"].publish(galileo_status)
 
+        # 每秒广播一次
+        if broadcast_count == 10:
+            broadcast_count = 0
+            data = "xq"
+            # 发送广播包
+            try:
+                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
+            except:
+                continue
+            ROBOT_STATUS.brightness = 0.0
+            ROBOT_STATUS.imageStatus = False
+            ROBOT_STATUS.odomStatus = False
+            ROBOT_STATUS.orbStartStatus = False
+            ROBOT_STATUS.orbInitStatus = False
+            ROBOT_STATUS.power = 0.0
+            ROBOT_STATUS.orbScaleStatus = False
         broadcast_count += 1
         rate.sleep()
     monitor_server.stop()
