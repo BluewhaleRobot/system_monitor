@@ -26,10 +26,12 @@
 #
 
 import numpy as np
+import rospy
 
 HOST = ''  # should not be 127.0.0.1 or localhost
 USERSOCKET_PORT = 20001  # 局域网udp命令监听端口
-BROADCAST_PORT = 22001
+BROADCAST_PORT = 22001 # 局域网广播端口
+BROADCAST_PORT_V2 = 22002 # 局域网广播端口V2版本
 
 MAX_VEL = 1.3
 MAX_THETA = 3.0
@@ -42,3 +44,4 @@ TF_TRANS = np.array([0.33, 0.0, 0.])
 ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
     '/opt/ros/kinetic/stacks:' + \
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
+SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.log"

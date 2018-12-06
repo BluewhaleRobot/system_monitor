@@ -79,6 +79,7 @@ class MonitorServer(threading.Thread):
         self.user_socket_remote = None
 
         self.nav_task = None
+        self.nav_guide_task = None
         rospy.loginfo("service started")
 
         def get_galileo_cmds(cmds):
@@ -186,12 +187,8 @@ class MonitorServer(threading.Thread):
                         if not self.map_thread.stopped():
                             rospy.loginfo("关闭视觉2")
                             self.map_thread.stop()
-                        os.system("pkill -f orb_track.py")
-                        os.system("pkill -f navGuide.py")
-                        os.system("pkill -f ORB_SLAM")
-                        os.system("pkill -f map_server")
-                        os.system("pkill -f move_base")
-                        os.system("pkill -f odom_map_broadcaster")
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
                     elif cmds[count][1] == 2:
                         rospy.loginfo("保存地图")
                         mapSaveFlag = Bool()
@@ -274,12 +271,27 @@ class MonitorServer(threading.Thread):
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
                         self.nav_flag = False
-                        os.system("pkill -f orb_track.py")
-                        os.system("pkill -f navGuide.py")
-                        os.system("pkill -f ORB_SLAM")
-                        os.system("pkill -f map_server")
-                        os.system("pkill -f move_base")
-                        os.system("pkill -f odom_map_broadcaster")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map0.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map1.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
+                    if cmds[count][1] == 5:
+                        rospy.loginfo("开启自动巡检")
+                        tilt_degree = Int16()
+                        tilt_degree.data = -19
+                        self.tilt_pub.publish(tilt_degree)
+                        if self.nav_thread.stopped():
+                            rospy.logwarn("巡检状态未启动")
+                            return
+                        if self.nav_task.loop_running_flag:
+                            rospy.logwarn("已经开始巡检")
+                            return
+                        self.nav_task.start_loop()
+                    if cmds[count][1] == 6:
+                        rospy.loginfo("停止自动巡检")
+                        if self.nav_task is not None:
+                            self.nav_task.stop_loop()
+
                 elif cmds[count][0] == ord('g'):
                     self.nav_task.set_goal(cmds[count][1])
                 elif cmds[count][0] == ord('i'):
@@ -319,6 +331,21 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("r"):
                     if self.nav_task is not None:
                         self.nav_task.reset_goals()
+                
+                # set loop and sleep time
+                if cmds[count][0] == ord("m") and cmds[count][1] == 5:
+                    if self.nav_thread.stopped():
+                        rospy.logwarn("巡检状态未启动")
+                        return
+                    if self.nav_task is not None:
+                        if not self.nav_task.loop_running_flag:
+                            tilt_degree = Int16()
+                            tilt_degree.data = -19
+                            self.tilt_pub.publish(tilt_degree)
+                            self.nav_task.sleep_time = cmds[count][2]
+                            self.nav_task.start_loop()
+                        else:
+                            self.nav_task.sleep_time = cmds[count][2]
 
         return res
 
