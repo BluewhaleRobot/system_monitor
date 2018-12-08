@@ -205,7 +205,7 @@ class NavigationTask():
         self.waypoints.append(waypoint)
         waypoint_stamped = PoseStamped()
         waypoint_stamped.header.frame_id = "map"
-        waypoint_stamped.header.stamp = rospy.Time.now()
+        waypoint_stamped.header.stamp = rospy.Time(0)
         waypoint_stamped.pose = waypoint
 
         # 转至ORB_SLAM/World坐标系
@@ -213,8 +213,8 @@ class NavigationTask():
         tf_flag = False
         while not tf_flag and not rospy.is_shutdown():
             try:
-                now = rospy.Time.now()
-                self.listener.waitForTransform("map", "ORB_SLAM/World", now,
+                t = rospy.Time(0);
+                self.listener.waitForTransform("map", "ORB_SLAM/World", t,
                                                rospy.Duration(1.0))
                 tf_flag = True
             except (tf.LookupException, tf.ConnectivityException,
@@ -225,6 +225,7 @@ class NavigationTask():
         rospy.loginfo("获取TF 成功 map->ORB_SLAM/World")
         target_point = self.listener.transformPose(
             "ORB_SLAM/World", waypoint_stamped)
+        target_point.header.stamp = rospy.Time.now()
         self.target_points.append(target_point)
 
 
@@ -275,7 +276,7 @@ class NavigationTask():
             delta_current = abs(theta_delta - theta_current)
             if delta_current > 3.1415926:
                 delta_current = abs(2 * 3.1415926 - delta_current)
-            
+
             rospy.loginfo("delta_current: " + str(delta_current))
             rospy.loginfo("current pose: " + str(current_pose.position.x) + " " + str(current_pose.position.y))
             rospy.loginfo("point: " + str(point.position.x) + " " + str(point.position.y))
@@ -323,7 +324,7 @@ class NavigationTask():
                     self.loop_exited_flag = True
                     return
         self.loop_exited_flag = True
-            
+
 
     def start_loop(self):
         self.loop_running_flag = True
@@ -332,4 +333,3 @@ class NavigationTask():
 
     def stop_loop(self):
         self.loop_running_flag = False
-
