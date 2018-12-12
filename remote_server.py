@@ -284,6 +284,9 @@ if __name__ == "__main__":
                 statu2 = 0x00
             if ROBOT_STATUS.orbInitStatus:
                 statu3 = 0x08  # 视觉系统状态
+                # 已经track
+                if monitor_server.nav_task != None:
+                    monitor_server.nav_task.track_init_flag = True
             else:
                 statu3 = 0x00
             if ROBOT_STATUS.orbGCFlag:
@@ -322,28 +325,6 @@ if __name__ == "__main__":
                     #print "stop motor " + str(rplidar_flag)
         if heart_beat_count == 1:
             rplidar_flag = False
-            # try:
-            #
-            # except:
-            #     print "rplidar not avalibale"
-
-        # 每秒广播一次
-        if broadcast_count == 10:
-            broadcast_count = 0
-            data = "xq"
-            # 发送广播包
-            try:
-                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
-            except:
-                continue
-            # clear data
-            ROBOT_STATUS.power = 0.0
-            ROBOT_STATUS.orbInitStatus = False
-            ROBOT_STATUS.orbStartStatus = False
-            ROBOT_STATUS.imageStatus = False
-            ROBOT_STATUS.odomStatus = False
-            ROBOT_STATUS.orbGCFlag = False
-            ROBOT_STATUS.orbGBAFlag = False
 
         # 发布状态topic
         galileo_status = GalileoStatus()
@@ -351,14 +332,18 @@ if __name__ == "__main__":
         if ROBOT_POSESTAMPED is not None:
             galileo_status.header = ROBOT_POSESTAMPED.header
         galileo_status.navStatus = 0
-        if ROBOT_STATUS.orbInitStatus:
-            galileo_status.visualStatus = 1
-        else:
+        if not ROBOT_STATUS.orbInitStatus:
             galileo_status.visualStatus = 2
-        if monitor_server.nav_task != None:
+
+            if monitor_server.nav_task != None and not monitor_server.nav_task.track_init_flag:
+                # 视觉未追踪状态，且从未追踪过
+                galileo_status.visualStatus = 0
+        else:
+            galileo_status.visualStatus = 1
+        if monitor_server.nav_task != None: # 导航任务正在运行
             galileo_status.navStatus = 1
         else:
-            galileo_status.visualStatus = 0
+            galileo_status.navStatus = 0
         galileo_status.power = ROBOT_STATUS.power
         galileo_status.targetNumID = -1
         if monitor_server.nav_task != None:
@@ -403,6 +388,22 @@ if __name__ == "__main__":
 
         pubs["GALILEO_STATUS_PUB"].publish(galileo_status)
 
+        # 每秒广播一次
+        if broadcast_count == 10:
+            broadcast_count = 0
+            data = "xq"
+            # 发送广播包
+            try:
+                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
+            except:
+                continue
+            ROBOT_STATUS.brightness = 0.0
+            ROBOT_STATUS.imageStatus = False
+            ROBOT_STATUS.odomStatus = False
+            ROBOT_STATUS.orbStartStatus = False
+            ROBOT_STATUS.orbInitStatus = False
+            ROBOT_STATUS.power = 0.0
+            ROBOT_STATUS.orbScaleStatus = False
         broadcast_count += 1
         rate.sleep()
     monitor_server.stop()

@@ -28,6 +28,7 @@
 import math
 import threading
 import time
+import os
 
 import actionlib
 import numpy as np
@@ -64,6 +65,7 @@ class NavigationTask():
         self.loop_running_flag = False
         self.loop_exited_flag = True
         self.sleep_time = 1
+        self.track_init_flag = False
 
         def get_odom(odom):
             with self.status_lock:
@@ -86,6 +88,10 @@ class NavigationTask():
             "/cmd_vel_nav", Twist, send_cmd_vel)
 
     def load_targets(self):
+        if not os.path.exists(self.nav_points_file):
+            self.target_points = []
+            self.waypoints = list()
+
         with open(self.nav_points_file, "r") as nav_data_file:
             nav_data_str = nav_data_file.readline()
             self.target_points = []
