@@ -133,6 +133,7 @@ class NavigationTask():
             rospy.logerr("Invalid goal id: " + str(goal_id))
             return
         self.current_goal_id = goal_id
+        self.goal_status = "WORKING"
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = 'map'
         goal.target_pose.header.stamp = rospy.Time.now()
@@ -146,7 +147,6 @@ class NavigationTask():
             self.cancel_goal()
             return
         self.move_base.send_goal(goal, done_cb=done_cb)
-        self.goal_status = "WORKING"
 
     def pause(self):
         if self.current_goal_status() == "WORKING":
@@ -219,7 +219,7 @@ class NavigationTask():
         tf_flag = False
         while not tf_flag and not rospy.is_shutdown():
             try:
-                t = rospy.Time(0);
+                t = rospy.Time(0)
                 self.listener.waitForTransform("map", "ORB_SLAM/World", t,
                                                rospy.Duration(1.0))
                 tf_flag = True
