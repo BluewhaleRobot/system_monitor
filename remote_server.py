@@ -270,6 +270,9 @@ if __name__ == "__main__":
                 statu2 = 0x00
             if ROBOT_STATUS.orbInitStatus:
                 statu3 = 0x08  # 视觉系统状态
+                # 已经track
+                if monitor_server.nav_task != None:
+                    monitor_server.nav_task.track_init_flag = True
             else:
                 statu3 = 0x00
             if ROBOT_STATUS.orbGCFlag:
@@ -293,6 +296,10 @@ if __name__ == "__main__":
         galileo_status.navStatus = 0
         if not ROBOT_STATUS.orbInitStatus:
             galileo_status.visualStatus = 2
+
+            if monitor_server.nav_task != None and not monitor_server.nav_task.track_init_flag:
+                # 视觉未追踪状态，且从未追踪过
+                galileo_status.visualStatus = 0
         else:
             galileo_status.visualStatus = 1
         if monitor_server.nav_task != None: # 导航任务正在运行

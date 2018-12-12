@@ -65,6 +65,7 @@ class NavigationTask():
         self.loop_running_flag = False
         self.loop_exited_flag = True
         self.sleep_time = 1
+        self.track_init_flag = False
 
         def get_odom(odom):
             with self.status_lock:
