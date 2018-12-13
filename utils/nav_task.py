@@ -66,6 +66,7 @@ class NavigationTask():
         self.loop_exited_flag = True
         self.sleep_time = 1
         self.track_init_flag = False
+        self.last_speed = None
 
         def get_odom(odom):
             with self.status_lock:
@@ -80,6 +81,7 @@ class NavigationTask():
             "xqserial_server/Odom", Odometry, get_odom)
 
         def send_cmd_vel(msg):
+            self.last_speed = msg
             if self.goal_status == "PAUSED":
                 return
             self.cmd_vel_pub.publish(msg)
@@ -151,6 +153,13 @@ class NavigationTask():
     def pause(self):
         if self.current_goal_status() == "WORKING":
             self.goal_status = "PAUSED"
+        if self.last_speed != None:
+            current_speed = self.last_speed.linear.x
+            for i in range(0, 100):
+                speed = Twist()
+                speed.linear.x = current_speed * (100 - i) / 100.0
+                self.cmd_vel_pub.publish(speed)
+                time.sleep(0.01)
         self.cmd_vel_pub.publish(Twist())
 
     def resume(self):
