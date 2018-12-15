@@ -433,7 +433,10 @@ class NavigationTask():
             return A*x + B
         A1, B1 = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
                                     [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
-        return (B1 / A1, B1)
+        if nearest_point_3[0] >= nearest_point[0]:
+            return (1 / A1, 1)
+        else:
+            return (-1 / A1, -1)
 
     def closest_node(self, node, nodes):
         filtered_nodes = filter(
