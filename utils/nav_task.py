@@ -38,18 +38,21 @@ from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion, Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_conjugate
 
 from config import TF_ROT, TF_TRANS
+from scipy.spatial.distance import cdist
+from scipy import optimize
+from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
 
 
 class NavigationTask():
 
-    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv"):
+    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv", nav_path_file="/home/xiaoqiang/slamdb/path.csv"):
         self.nav_points_file = nav_points_file
         self.tf_rot = TF_ROT
         self.tf_trans = TF_TRANS
-        self.load_targets()
+        self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
         self.move_base = actionlib.SimpleActionClient("move_base",
                                                       MoveBaseAction)
@@ -59,13 +62,14 @@ class NavigationTask():
         rospy.loginfo("Starting navigation test")
         self.current_pose_stamped = None
         self.status_lock = threading.Lock()
-        self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.loop_running_flag = False
         self.loop_exited_flag = True
         self.sleep_time = 1
         self.track_init_flag = False
+        self.last_speed = None
+        self.load_targets_exited_flag = True
 
         def get_odom(odom):
             with self.status_lock:
@@ -80,6 +84,7 @@ class NavigationTask():
             "xqserial_server/Odom", Odometry, get_odom)
 
         def send_cmd_vel(msg):
+            self.last_speed = msg
             if self.goal_status == "PAUSED":
                 return
             self.cmd_vel_pub.publish(msg)
@@ -87,7 +92,9 @@ class NavigationTask():
         self.nav_cmd_vel_sub = rospy.Subscriber(
             "/cmd_vel_nav", Twist, send_cmd_vel)
 
-    def load_targets(self):
+        self.start_load_targets()
+
+    def load_targets_task(self):
         if not os.path.exists(self.nav_points_file):
             self.target_points = []
             self.waypoints = list()
@@ -102,14 +109,73 @@ class NavigationTask():
                 self.target_points.append([pos_x, pos_y, pos_z])
                 nav_data_str = nav_data_file.readline()
 
-        q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
-        q = Quaternion(*q_angle)
-
         self.waypoints = list()
+        nav_path_points = []
+        with open("/home/xiaoqiang/slamdb/path.csv", "r") as nav_data_file:
+            nav_data_str = nav_data_file.readline()
+            while len(nav_data_str) != 0:
+                pos_x = float(nav_data_str.split(" ")[0])
+                pos_y = float(nav_data_str.split(" ")[1])
+                pos_z = float(nav_data_str.split(" ")[2])
+                nav_path_points.append([pos_x, pos_y, pos_z])
+                nav_data_str = nav_data_file.readline()
+        nav_path_points_2d = [[point[0], point[2]]
+                              for point in nav_path_points]
         for point in self.target_points:
-            Tac = np.array([point[0], point[1], point[2]])
-            Tbc = self.tf_rot.dot(Tac) + self.tf_trans
-            self.waypoints.append(Pose(Point(Tbc[0], Tbc[1], 0.0), q))
+            pose_in_world = PoseStamped()
+            pose_in_world.header.frame_id = "ORB_SLAM/World"
+            pose_in_world.header.stamp = rospy.Time(0)
+            pose_in_world.pose.position = Point(point[0], point[1], point[2])
+            axis = self.get_target_direction(
+                [point[0], point[2]], nav_path_points_2d)
+            q_angle = quaternion_from_euler(
+                math.pi / 2, -math.atan2(axis[1], axis[0]), 0, axes='sxyz')
+            pose_in_world.pose.orientation = Quaternion(*q_angle)
+
+            # 转至map坐标系
+            rospy.loginfo("获取ORB_SLAM/World->TF map")
+            tf_flag = False
+            while not tf_flag and not rospy.is_shutdown():
+                try:
+                    t = rospy.Time(0)
+                    self.listener.waitForTransform("ORB_SLAM/World", "map", t,
+                                                   rospy.Duration(1.0))
+                    tf_flag = True
+                except (tf.LookupException, tf.ConnectivityException,
+                        tf.ExtrapolationException, tf.Exception) as e:
+                    tf_flag = False
+                    rospy.logwarn("获取TF失败 ORB_SLAM/World->map")
+                    rospy.logwarn(e)
+            rospy.loginfo("获取TF 成功 ORB_SLAM/World->map")
+            waypoint = self.listener.transformPose(
+                "map", pose_in_world)
+            self.waypoints.append(waypoint)
+        self.load_targets_exited_flag = True
+        # 通过全局规划器，计算目标点的朝向
+        rospy.loginfo("waiting for move_base/make_plan service")
+        rospy.wait_for_service("/move_base/make_plan")
+        rospy.loginfo("waiting for move_base/make_plan service succeed")
+        make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
+        for waypoint in self.waypoints:
+            if waypoint == self.waypoints[0]:
+                continue
+            req = GetPlanRequest()
+            req.start = self.waypoints[0]
+            req.goal = waypoint
+            req.tolerance = 0.1
+            res = make_plan(req)
+            plan_path_2d = [[point.pose.position.x, point.pose.position.y]
+                            for point in res.plan.poses]
+            angle = self.get_target_direction(
+                [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
+            q_angle = quaternion_from_euler(0, 0, math.atan2(
+                angle[1], angle[0]) + math.pi, axes='sxyz')
+            waypoint.pose.orientation = Quaternion(*q_angle)
+
+    def start_load_targets(self):
+        if self.load_targets_exited_flag:
+            self.load_targets_exited_flag = False
+            threading._start_new_thread(self.load_targets_task, ())
 
     def shutdown(self):
         rospy.loginfo("Stopping the robot...")
@@ -135,9 +201,7 @@ class NavigationTask():
         self.current_goal_id = goal_id
         self.goal_status = "WORKING"
         goal = MoveBaseGoal()
-        goal.target_pose.header.frame_id = 'map'
-        goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.pose = self.waypoints[goal_id]
+        goal.target_pose = self.waypoints[goal_id]
 
         def done_cb(status, result):
             self.goal_status = "FREE"
@@ -151,6 +215,13 @@ class NavigationTask():
     def pause(self):
         if self.current_goal_status() == "WORKING":
             self.goal_status = "PAUSED"
+        if self.last_speed != None:
+            current_speed = self.last_speed.linear.x
+            for i in range(0, 100):
+                speed = Twist()
+                speed.linear.x = current_speed * (100 - i) / 100.0
+                self.cmd_vel_pub.publish(speed)
+                time.sleep(0.01)
         self.cmd_vel_pub.publish(Twist())
 
     def resume(self):
@@ -192,7 +263,7 @@ class NavigationTask():
                 tf.ExtrapolationException, tf.Exception):
             return -1
         current_pose = self.current_pose_stamped.pose
-        mgoal = self.waypoints[self.current_goal_id]
+        mgoal = self.waypoints[self.current_goal_id].pose
         return self.pose_distance(mgoal, current_pose)
 
     def pose_distance(self, pose1, pose2):
@@ -208,11 +279,11 @@ class NavigationTask():
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
         waypoint = Pose(Point(pos_x, pos_y, pos_z), q)
-        self.waypoints.append(waypoint)
         waypoint_stamped = PoseStamped()
         waypoint_stamped.header.frame_id = "map"
         waypoint_stamped.header.stamp = rospy.Time(0)
         waypoint_stamped.pose = waypoint
+        self.waypoints.append(waypoint_stamped)
 
         # 转至ORB_SLAM/World坐标系
         rospy.loginfo("获取TF map->ORB_SLAM/World")
@@ -234,11 +305,10 @@ class NavigationTask():
         target_point.header.stamp = rospy.Time.now()
         self.target_points.append(target_point)
 
-
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
-        self.load_targets()
+        self.start_load_targets()
 
     def loop_task(self):
         # 获取当前最近的位置
@@ -274,8 +344,8 @@ class NavigationTask():
         next_target = None
         mini_distance = 0
         # waypoints 是在map坐标系的点
-        back_points = [] # 在机器人背后的点
-        for point in self.waypoints:
+        back_points = []  # 在机器人背后的点
+        for point in [waypoint.pose for waypoint in self.waypoints]:
             # 判断是否在机器人前方
             theta_delta = math.atan2(
                 point.position.y - current_pose.position.y, point.position.x - current_pose.position.x)
@@ -284,8 +354,10 @@ class NavigationTask():
                 delta_current = abs(2 * 3.1415926 - delta_current)
 
             rospy.loginfo("delta_current: " + str(delta_current))
-            rospy.loginfo("current pose: " + str(current_pose.position.x) + " " + str(current_pose.position.y))
-            rospy.loginfo("point: " + str(point.position.x) + " " + str(point.position.y))
+            rospy.loginfo("current pose: " + str(current_pose.position.x) +
+                          " " + str(current_pose.position.y))
+            rospy.loginfo("point: " + str(point.position.x) +
+                          " " + str(point.position.y))
             rospy.loginfo("theta_current: " + str(theta_current))
             rospy.loginfo("theta_delta: " + str(theta_delta))
             if delta_current > math.pi / 2:
@@ -305,7 +377,8 @@ class NavigationTask():
                     mini_distance = current_distance
                     next_target = point
 
-        next_index = self.waypoints.index(next_target)
+        next_index = [waypoint.pose for waypoint in self.waypoints].index(
+            next_target)
         while not rospy.is_shutdown() and self.loop_running_flag:
             rospy.loginfo("next goal " + str(next_index))
             self.set_goal(next_index)
@@ -331,7 +404,6 @@ class NavigationTask():
                     return
         self.loop_exited_flag = True
 
-
     def start_loop(self):
         self.loop_running_flag = True
         if self.loop_exited_flag:
@@ -339,3 +411,34 @@ class NavigationTask():
 
     def stop_loop(self):
         self.loop_running_flag = False
+
+    def get_target_direction(self, target_point, nav_path_points):
+        # 映射至二维点，首先在ORB_SLAM/World坐标系下进行计算
+        target_point_2d = target_point
+        nav_path_points_2d = nav_path_points
+        # 获取距此目标点最近的路径点
+        nearest_point = self.closest_node(target_point_2d, nav_path_points_2d)
+        # 找距离此路径点最近的其他路径点
+        nav_path_points_2d_filterd = filter(
+            lambda point: point[0] != target_point_2d[0] and point[1] != target_point_2d[1], nav_path_points_2d)
+        nearest_point_2 = self.closest_node(
+            nearest_point, nav_path_points_2d_filterd)
+        # 距此路径点第二近点
+        nav_path_points_2d_filterd = filter(
+            lambda point: point[0] != nearest_point_2[0] and point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
+        nearest_point_3 = self.closest_node(
+            nearest_point, nav_path_points_2d_filterd)
+
+        def f_1(x, A, B):
+            return A*x + B
+        A1, B1 = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
+                                    [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
+        if nearest_point_3[0] >= nearest_point[0]:
+            return (1 / A1, 1)
+        else:
+            return (-1 / A1, -1)
+
+    def closest_node(self, node, nodes):
+        filtered_nodes = filter(
+            lambda point: point[0] != node[0] or point[1] != node[1], nodes)
+        return filtered_nodes[cdist([node], filtered_nodes).argmin()]
