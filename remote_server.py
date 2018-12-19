@@ -32,14 +32,18 @@ from socket import AF_INET, SO_BROADCAST, SOCK_DGRAM, SOL_SOCKET, socket
 import numpy as np
 import rospy
 import tf
+import os
+import psutil
+import subprocess
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from geometry_msgs.msg import Pose, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, Int32, UInt32
 from system_monitor.msg import Status
 
-from utils.config import BROADCAST_PORT, TF_ROT, TF_TRANS
+from utils.config import BROADCAST_PORT, TF_ROT, TF_TRANS,ROS_PACKAGE_PATH
 from utils.monitor_server import MonitorServer
+from sensor_msgs.msg import LaserScan
 
 ROBOT_STATUS = Status()
 ROBOT_STATUS.brightness = 0.0
@@ -74,6 +78,7 @@ NAV_LASTTIME = None
 T_HF = [0.0, 0.0, 0.0]
 Q_HF = [0.0, 0.0, 0.0, 1.0]
 
+rplidar_flag = False
 
 def get_power(power):
     with ROBOT_STATUS_LOCK:
@@ -154,6 +159,12 @@ def get_charge_status(charge_status):
         CHARGE_STATUS = charge_status
 
 
+def get_scan(scan):
+    global rplidar_flag
+    if scan != None:
+        rplidar_flag = True
+        #print "get scan"
+
 def init_sub_pubs():
     rospy.init_node("remote_server", anonymous=True)
     rospy.Subscriber("/xqserial_server/Power", Float64, get_power)
@@ -167,6 +178,7 @@ def init_sub_pubs():
     rospy.Subscriber('/nav_setStop', Bool, get_nav_flag)
     rospy.Subscriber('/cmd_vel', Twist, get_cmd_vel)
     rospy.Subscriber('/bw_auto_dock/Chargestatus', Int32, get_charge_status)
+    rospy.Subscriber('/scan', LaserScan, get_scan)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
     ELEVATOR_PUB = rospy.Publisher('/elevatorPose', UInt32, queue_size=1)
     CMD_VEL_PUB = rospy.Publisher('/cmd_vel', Twist, queue_size=0)
@@ -205,6 +217,8 @@ if __name__ == "__main__":
     listener = tf.TransformListener(True, rospy.Duration(10.0))
     t_ac = np.array([0., 0., 0.])
     theta_send = 0.
+    sub_process_thread = None
+    sub_process_thread_ps_process = None
     while not rospy.is_shutdown():
 
         if heart_beat_count == 40:
@@ -270,6 +284,9 @@ if __name__ == "__main__":
                 statu2 = 0x00
             if ROBOT_STATUS.orbInitStatus:
                 statu3 = 0x08  # 视觉系统状态
+                # 已经track
+                if monitor_server.nav_task != None:
+                    monitor_server.nav_task.track_init_flag = True
             else:
                 statu3 = 0x00
             if ROBOT_STATUS.orbGCFlag:
@@ -285,23 +302,29 @@ if __name__ == "__main__":
         SEND_DATA[3] = len(SEND_DATA) - 4
         monitor_server.sendto(bytes(SEND_DATA))
 
-        # 每秒广播一次
-        if broadcast_count == 10:
-            broadcast_count = 0
-            data = "xq"
-            # 发送广播包
-            try:
-                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
-            except:
-                continue
-            # clear data
-            ROBOT_STATUS.power = 0.0
-            ROBOT_STATUS.orbInitStatus = False
-            ROBOT_STATUS.orbStartStatus = False
-            ROBOT_STATUS.imageStatus = False
-            ROBOT_STATUS.odomStatus = False
-            ROBOT_STATUS.orbGCFlag = False
-            ROBOT_STATUS.orbGBAFlag = False
+        if heart_beat_count == 39:
+            new_env = os.environ.copy()
+            new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
+            if sub_process_thread != None :
+                sub_process_thread_ps_process = psutil.Process(pid=sub_process_thread.pid)
+                for child in sub_process_thread_ps_process.children(recursive=True):
+                    child.kill()
+                sub_process_thread_ps_process.kill()
+                sub_process_thread = None
+            else:
+                cmd = None
+                if ROBOT_STATUS.orbStartStatus and not rplidar_flag:
+                    #打开雷达电机
+                    cmd = "rosservice call /start_motor"
+                    sub_process_thread = subprocess.Popen(cmd, shell=True, env=new_env)
+                    #print "start motor " + str(rplidar_flag)
+                elif rplidar_flag and not ROBOT_STATUS.orbStartStatus:
+                    #关闭雷达电机
+                    cmd = "rosservice call /stop_motor"
+                    sub_process_thread = subprocess.Popen(cmd, shell=True, env=new_env)
+                    #print "stop motor " + str(rplidar_flag)
+        if heart_beat_count == 1:
+            rplidar_flag = False
 
         # 发布状态topic
         galileo_status = GalileoStatus()
@@ -309,14 +332,18 @@ if __name__ == "__main__":
         if ROBOT_POSESTAMPED is not None:
             galileo_status.header = ROBOT_POSESTAMPED.header
         galileo_status.navStatus = 0
-        if ROBOT_STATUS.orbInitStatus:
-            galileo_status.visualStatus = 1
-        else:
+        if not ROBOT_STATUS.orbInitStatus:
             galileo_status.visualStatus = 2
-        if monitor_server.nav_task != None:
+
+            if monitor_server.nav_task != None and not monitor_server.nav_task.track_init_flag:
+                # 视觉未追踪状态，且从未追踪过
+                galileo_status.visualStatus = 0
+        else:
+            galileo_status.visualStatus = 1
+        if monitor_server.nav_task != None: # 导航任务正在运行
             galileo_status.navStatus = 1
         else:
-            galileo_status.visualStatus = 0
+            galileo_status.navStatus = 0
         galileo_status.power = ROBOT_STATUS.power
         galileo_status.targetNumID = -1
         if monitor_server.nav_task != None:
@@ -361,6 +388,22 @@ if __name__ == "__main__":
 
         pubs["GALILEO_STATUS_PUB"].publish(galileo_status)
 
+        # 每秒广播一次
+        if broadcast_count == 10:
+            broadcast_count = 0
+            data = "xq"
+            # 发送广播包
+            try:
+                s.sendto(data, ('<broadcast>', BROADCAST_PORT))
+            except:
+                continue
+            ROBOT_STATUS.brightness = 0.0
+            ROBOT_STATUS.imageStatus = False
+            ROBOT_STATUS.odomStatus = False
+            ROBOT_STATUS.orbStartStatus = False
+            ROBOT_STATUS.orbInitStatus = False
+            ROBOT_STATUS.power = 0.0
+            ROBOT_STATUS.orbScaleStatus = False
         broadcast_count += 1
         rate.sleep()
     monitor_server.stop()

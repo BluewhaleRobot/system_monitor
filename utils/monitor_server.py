@@ -178,6 +178,25 @@ class MonitorServer(threading.Thread):
                 elif cmds[count][0] == ord('V'):
                     if cmds[count][1] == 0:
                         rospy.loginfo("开启视觉")
+
+                        rospy.loginfo("关闭导航")
+                        if self.nav_task is not None:
+                            self.nav_task.shutdown()
+                            self.nav_task = None
+                        tilt_degree = Int16()
+                        tilt_degree.data = 0
+                        self.tilt_pub.publish(tilt_degree)
+                        if not self.nav_thread.stopped():
+                            self.nav_thread.stop()
+                        self.speed_cmd.linear.x = 0
+                        self.speed_cmd.angular.z = 0
+                        self.cmd_vel_pub.publish(self.speed_cmd)
+                        self.nav_flag = False
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map0.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map1.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
+                        os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
+
                         if self.map_thread.stopped():
                             rospy.loginfo("开启视觉2")
                             self.map_thread.update = False
@@ -208,47 +227,79 @@ class MonitorServer(threading.Thread):
                     self.elevator_pub.publish(elePose)
                 elif cmds[count][0] == ord('m'):
                     time1_diff = time_now - self.last_nav_time
-                    if cmds[count][1] == 1:
-                        if time1_diff.to_sec() < 30:
-                            continue
-                        rospy.loginfo("开始低速巡检")
-                        self.last_nav_time = time1_diff
-                        tilt_degree = Int16()
-                        tilt_degree.data = -19
-                        self.tilt_pub.publish(tilt_degree)
-                        if self.nav_thread.stopped():
-                            self.nav_thread.setspeed(1)
-                            self.nav_thread.start()
-                            self.nav_task = NavigationTask()
+                    # if cmds[count][1] == 1:
+                    #     if time1_diff.to_sec() < 30:
+                    #         continue
+                    #     rospy.loginfo("开启导航服务")
 
-                    if cmds[count][1] == 2:
-                        if time1_diff.to_sec() < 30:
-                            continue
-                        rospy.loginfo("开始中速巡检")
-                        self.last_nav_time = time1_diff
-                        tilt_degree = Int16()
-                        tilt_degree.data = -19
-                        self.tilt_pub.publish(tilt_degree)
-                        if self.nav_thread.stopped():
-                            self.nav_thread.setspeed(2)
-                            self.nav_thread.start()
-                            self.nav_task = NavigationTask()
-                    if cmds[count][1] == 3:
-                        if time1_diff.to_sec() < 30:
-                            continue
-                        rospy.loginfo("开始高速巡检")
-                        self.last_nav_time = time1_diff
-                        tilt_degree = Int16()
-                        tilt_degree.data = -19
-                        self.tilt_pub.publish(tilt_degree)
-                        if self.nav_thread.stopped():
-                            self.nav_thread.setspeed(3)
-                            self.nav_thread.start()
-                            self.nav_task = NavigationTask()
+                    #     rospy.loginfo("关闭建图服务")
+                    #     if not self.map_thread.stopped():
+                    #         rospy.loginfo("关闭建图服务2")
+                    #         self.map_thread.stop()
+                    #     os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                    #     os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
+                    #     self.last_nav_time = time1_diff
+                    #     tilt_degree = Int16()
+                    #     tilt_degree.data = -19
+                    #     self.tilt_pub.publish(tilt_degree)
+                    #     if self.nav_thread.stopped():
+                    #         self.nav_thread.setspeed(1)
+                    #         self.nav_thread.start()
+                    #         self.nav_task = NavigationTask()
+
+                    # if cmds[count][1] == 2:
+                    #     if time1_diff.to_sec() < 30:
+                    #         continue
+                    #     rospy.loginfo("开始中速巡检")
+
+                    #     rospy.loginfo("关闭视觉")
+                    #     if not self.map_thread.stopped():
+                    #         rospy.loginfo("关闭视觉2")
+                    #         self.map_thread.stop()
+                    #     os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                    #     os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
+                    #     self.last_nav_time = time1_diff
+                    #     tilt_degree = Int16()
+                    #     tilt_degree.data = -19
+                    #     self.tilt_pub.publish(tilt_degree)
+                    #     if self.nav_thread.stopped():
+                    #         self.nav_thread.setspeed(2)
+                    #         self.nav_thread.start()
+                    #         self.nav_task = NavigationTask()
+                    # if cmds[count][1] == 3:
+                    #     if time1_diff.to_sec() < 30:
+                    #         continue
+                    #     rospy.loginfo("开始高速巡检")
+
+                    #     rospy.loginfo("关闭视觉")
+                    #     if not self.map_thread.stopped():
+                    #         rospy.loginfo("关闭视觉2")
+                    #         self.map_thread.stop()
+                    #     os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                    #     os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
+                    #     self.last_nav_time = time1_diff
+                    #     tilt_degree = Int16()
+                    #     tilt_degree.data = -19
+                    #     self.tilt_pub.publish(tilt_degree)
+                    #     if self.nav_thread.stopped():
+                    #         self.nav_thread.setspeed(3)
+                    #         self.nav_thread.start()
+                    #         self.nav_task = NavigationTask()
                     if cmds[count][1] == 0:
                         if time1_diff.to_sec() < 30:
                             continue
                         rospy.loginfo("开启视觉，不巡检")
+
+                        rospy.loginfo("关闭视觉")
+                        if not self.map_thread.stopped():
+                            rospy.loginfo("关闭视觉2")
+                            self.map_thread.stop()
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
                         self.last_nav_time = time1_diff
                         tilt_degree = Int16()
                         tilt_degree.data = -19
@@ -256,9 +307,19 @@ class MonitorServer(threading.Thread):
                         if self.nav_thread.stopped():
                             self.nav_thread.setspeed(0)
                             self.nav_thread.start()
+                            if self.nav_task is not None:
+                                self.nav_task.shutdown()
                             self.nav_task = NavigationTask()
                     if cmds[count][1] == 4:
                         rospy.loginfo("关闭自主巡检")
+
+                        rospy.loginfo("关闭视觉")
+                        if not self.map_thread.stopped():
+                            rospy.loginfo("关闭视觉2")
+                            self.map_thread.stop()
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
                         if self.nav_task is not None:
                             self.nav_task.shutdown()
                             self.nav_task = None
@@ -267,6 +328,8 @@ class MonitorServer(threading.Thread):
                         self.tilt_pub.publish(tilt_degree)
                         if not self.nav_thread.stopped():
                             self.nav_thread.stop()
+                            if self.nav_task is not None:
+                                self.nav_task.shutdown()
                         self.speed_cmd.linear.x = 0
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
@@ -277,6 +340,14 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
                     if cmds[count][1] == 5:
                         rospy.loginfo("开启自动巡检")
+
+                        rospy.loginfo("关闭视觉")
+                        if not self.map_thread.stopped():
+                            rospy.loginfo("关闭视觉2")
+                            self.map_thread.stop()
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
                         tilt_degree = Int16()
                         tilt_degree.data = -19
                         self.tilt_pub.publish(tilt_degree)
