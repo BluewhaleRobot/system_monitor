@@ -39,16 +39,16 @@ from scale_orb import ScaleORB
 
 class MapService(threading.Thread):
     # orb_slam建图线程
-    def __init__(self, robot_status_lock, robot_status, update=False):
+    def __init__(self, galileo_status, galileo_status_lock, update=False):
         super(MapService, self).__init__()
         self._stop = threading.Event()
         self._stop.set()
         self.P = None
         self.ps_process = None
         self.scale_orb_thread = None
-        self.robot_status_lock = robot_status_lock
-        self.robot_status = robot_status
         self.update = update
+        self.galileo_status = galileo_status
+        self.galileo_status_lock = galileo_status_lock
 
     def stop(self):
         if self.scale_orb_thread != None:
@@ -62,7 +62,7 @@ class MapService(threading.Thread):
             self.ps_process.kill()
         self.P = None
         self._stop.set()
-        self.__init__(self.robot_status_lock, self.robot_status)
+        self.__init__(self.galileo_status, self.galileo_status_lock)
 
     def stopped(self):
         return self._stop.isSet()
@@ -80,11 +80,9 @@ class MapService(threading.Thread):
                 self.ps_process = psutil.Process(pid=self.P.pid)
             else:
                 if self.ps_process.is_running():
-                    self.robot_status_lock.acquire()
-                    self.robot_status.orbStartStatus = True
-                    self.robot_status_lock.release()
                     if self.scale_orb_thread == None:
-                        self.scale_orb_thread = ScaleORB(self.robot_status)
+                        self.scale_orb_thread = ScaleORB(
+                            self.galileo_status, self.galileo_status_lock)
                         self.scale_orb_thread.start()
                 else:
                     if self.scale_orb_thread != None:

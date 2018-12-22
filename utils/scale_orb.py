@@ -35,7 +35,7 @@ from geometry_msgs.msg import Pose, Pose2D
 
 class ScaleORB(threading.Thread):
 
-    def __init__(self, robot_status):
+    def __init__(self, galileo_status, galileo_status_lock):
         super(ScaleORB, self).__init__()
         self._stop = threading.Event()
         self.car_odoms = 0.0
@@ -48,7 +48,8 @@ class ScaleORB(threading.Thread):
         self.scale_lock = threading.Lock()
         self.car_begin_flag = True
         self.camera_begin_flag = True
-        self.robot_status = robot_status
+        self.galileo_status = galileo_status
+        self.galileo_status_lock = galileo_status_lock
 
     def stop(self):
         self._stop.set()
@@ -82,7 +83,10 @@ class ScaleORB(threading.Thread):
             self.camera_last_pose = pose
             self.camera_pose_lock.release()
 
-        while not self.robot_status.orbInitStatus and not rospy.is_shutdown():
+        while not rospy.is_shutdown():
+            with self.galileo_status_lock:
+                if self.galileo_status.visualStatus == 1:
+                    break
             time.sleep(0.5)
         if rospy.is_shutdown():
             self.stop()

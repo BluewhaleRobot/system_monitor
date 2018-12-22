@@ -145,12 +145,7 @@ def do_security():
     # 视觉丢失超时保险
     # 里程计丢失超时保险
     if (CAMERA_UPDATE_FLAG and time2_diff.to_sec() > 180 and not BAR_FLAG) or time1_diff.to_sec() > 5.:
-        # 发布navFlag
-        if NAV_FLAG_PUB != None:
-            nav_flag = Bool()
-            nav_flag.data = True
-            NAV_FLAG_PUB.publish(nav_flag)
-        # 发布全局禁止ｆｌａｇ
+        # 发布全局禁止flag
         global_move_flag = Bool()
         global_move_flag.data = False
         GLOBAL_MOVE_PUB.publish(global_move_flag)

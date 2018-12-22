@@ -36,7 +36,7 @@ import threading
 import rospy
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, UInt32
+from std_msgs.msg import Bool, Float64, UInt32, Int32
 from system_monitor.msg import Status
 from xiaoqiang_log.msg import LogRecord
 
@@ -114,8 +114,8 @@ def monitor():
     global REPORT_PUB
     rospy.init_node("monitor", anonymous=True)
     rospy.Subscriber("/usb_cam/brightness", UInt32, get_brightness)
-    rospy.Subscriber("/usb_cam/image_raw", rospy.AnyMsg, get_image)
-    rospy.Subscriber("/ORB_SLAM/Frame", rospy.AnyMsg, get_orb_start_status)
+    rospy.Subscriber("/usb_cam/camera_info", rospy.AnyMsg, get_image)
+    rospy.Subscriber("/ORB_SLAM/TrackingStatus", Int32, get_orb_start_status)
     rospy.Subscriber("/xqserial_server/Power", Float64, get_power)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, get_odom)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, get_orb_track_flag)

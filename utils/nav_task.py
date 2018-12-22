@@ -61,13 +61,13 @@ class NavigationTask():
         rospy.loginfo("Connected to move base server")
         rospy.loginfo("Starting navigation test")
         self.current_pose_stamped = None
+        self.current_pose_stamped_map = None
         self.status_lock = threading.Lock()
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.loop_running_flag = False
         self.loop_exited_flag = True
         self.sleep_time = 1
-        self.track_init_flag = False
         self.last_speed = None
         self.load_targets_exited_flag = True
 
@@ -262,9 +262,21 @@ class NavigationTask():
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
-        current_pose = self.current_pose_stamped.pose
+        self.current_pose_stamped_map = self.current_pose_stamped
         mgoal = self.waypoints[self.current_goal_id].pose
-        return self.pose_distance(mgoal, current_pose)
+        return self.pose_distance(mgoal, self.current_pose_stamped_map.pose)
+
+    def update_pose(self):
+        latest = rospy.Time(0)
+        self.current_pose_stamped.header.stamp = latest
+        try:
+            self.current_pose_stamped = self.listener.transformPose(
+                "/map", self.current_pose_stamped)
+        except (tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException, tf.Exception):
+            return -1
+        self.current_pose_stamped_map = self.current_pose_stamped
+        return self.current_pose_stamped
 
     def pose_distance(self, pose1, pose2):
         return math.sqrt(math.pow((pose1.position.x - pose2.position.x), 2)
