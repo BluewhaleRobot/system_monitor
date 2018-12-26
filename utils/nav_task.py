@@ -164,6 +164,8 @@ class NavigationTask():
             req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
+            if len(res.plan.poses) > 10:
+                res.plan.poses = res.plan.poses[:-4]
             plan_path_2d = [[point.pose.position.x, point.pose.position.y]
                             for point in res.plan.poses]
             angle = self.get_target_direction(
@@ -394,9 +396,16 @@ class NavigationTask():
         while not rospy.is_shutdown() and self.loop_running_flag:
             rospy.loginfo("next goal " + str(next_index))
             self.set_goal(next_index)
-            # 等待goal的状态
-            time.sleep(1)
-            while not rospy.is_shutdown():
+
+            # 设置导航点失败，可能由于系统尚未初始化
+            # 未处于工作状态，且未处于任务完成状态
+            while self.goal_status != "WORKING" and not \
+                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2 \
+                    and self.current_goal_distance() > 0):
+                time.sleep(1)
+                self.set_goal(next_index)
+
+            while not rospy.is_shutdown() and self.loop_running_flag:
                 if self.goal_status == "FREE" and \
                         self.current_goal_distance() < 0.2 and \
                         self.current_goal_distance() > 0:
@@ -443,9 +452,9 @@ class NavigationTask():
 
         def f_1(x, A, B):
             return A*x + B
-        A1, B1 = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
+        A1, _ = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
                                     [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
-        if nearest_point_3[0] >= nearest_point[0]:
+        if (nearest_point_3[0] - nearest_point[0]) * A1 >= 0:
             return (1 / A1, 1)
         else:
             return (-1 / A1, -1)
