@@ -258,13 +258,13 @@ class NavigationTask():
 
         latest = rospy.Time(0)
         self.current_pose_stamped.header.stamp = latest
+        self.current_pose_stamped.header.frame_id = "odom"
         try:
-            self.current_pose_stamped = self.listener.transformPose(
+            self.current_pose_stamped_map = self.listener.transformPose(
                 "/map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
-        self.current_pose_stamped_map = self.current_pose_stamped
         mgoal = self.waypoints[self.current_goal_id].pose
         return self.pose_distance(mgoal, self.current_pose_stamped_map.pose)
 
@@ -272,13 +272,13 @@ class NavigationTask():
         latest = rospy.Time(0)
         self.current_pose_stamped.header.stamp = latest
         try:
-            self.current_pose_stamped = self.listener.transformPose(
+            self.current_pose_stamped.header.frame_id = "odom"
+            self.current_pose_stamped_map = self.listener.transformPose(
                 "/map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
-        self.current_pose_stamped_map = self.current_pose_stamped
-        return self.current_pose_stamped
+        return self.current_pose_stamped_map
 
     def pose_distance(self, pose1, pose2):
         return math.sqrt(math.pow((pose1.position.x - pose2.position.x), 2)
@@ -346,9 +346,9 @@ class NavigationTask():
         if not tf_flag:
             return
         with self.status_lock:
-            self.current_pose_stamped = self.listener.transformPose(
+            self.current_pose_stamped_map = self.listener.transformPose(
                 "/map", self.current_pose_stamped)
-        current_pose = self.current_pose_stamped.pose
+        current_pose = self.current_pose_stamped_map.pose
         current_pose_q = [current_pose.orientation.x, current_pose.orientation.y,
                           current_pose.orientation.z, current_pose.orientation.w]
         theta_current = euler_from_quaternion(current_pose_q)[2]
