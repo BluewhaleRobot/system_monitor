@@ -406,14 +406,13 @@ class NavigationTask():
                 self.set_goal(next_index)
 
             while not rospy.is_shutdown() and self.loop_running_flag:
-                if self.goal_status == "FREE" and \
-                        self.current_goal_distance() < 0.2 and \
-                        self.current_goal_distance() > 0:
+                if self.goal_status == "FREE":
                     break
                 if not self.loop_running_flag:
                     self.loop_exited_flag = True
                     return
                 time.sleep(0.5)
+            
             next_index += 1
             next_index = next_index % len(self.waypoints)
             sleep_count = 0

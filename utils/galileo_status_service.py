@@ -139,7 +139,8 @@ class GalileoStatusService(threading.Thread):
         self._stop.clear()
         while not self.stopped() and not rospy.is_shutdown():
             with self.galileo_status_lock:
-                if self.monitor_server.nav_task:
+                nav_task = self.monitor_server.nav_task
+                if nav_task is not None:
                     self.galileo_status.navStatus = 1
                 else:
                     self.galileo_status.navStatus = 0
@@ -152,36 +153,36 @@ class GalileoStatusService(threading.Thread):
                 self.galileo_status.gbaStatus = self.gba_status
                 self.galileo_status.chargeStatus = self.charge_status
                 self.galileo_status.loopStatus = 0
-                if self.monitor_server.nav_task != None:
-                    self.galileo_status.loopStatus = self.monitor_server.nav_task.loop_running_flag
+                if nav_task is not None:
+                    self.galileo_status.loopStatus = nav_task.loop_running_flag
                 self.galileo_status.power = self.power
                 self.galileo_status.targetNumID = -1
-                if self.monitor_server.nav_task != None:
-                    self.galileo_status.targetNumID = self.monitor_server.nav_task.current_goal_id
+                if nav_task is not None:
+                    self.galileo_status.targetNumID = nav_task.current_goal_id
 
                 self.galileo_status.targetStatus = 0
                 self.galileo_status.angleGoalStatus = 1
-                if self.monitor_server.nav_task != None:
-                    if self.monitor_server.nav_task.current_goal_status() == "FREE":
+                if nav_task is not None:
+                    if nav_task.current_goal_status() == "FREE":
                         self.galileo_status.targetStatus = 0
                         self.galileo_status.angleGoalStatus = 1
-                    if self.monitor_server.nav_task.current_goal_status() == "WORKING":
+                    if nav_task.current_goal_status() == "WORKING":
                         self.galileo_status.targetStatus = 1
                         self.galileo_status.angleGoalStatus = 0
-                    if self.monitor_server.nav_task.current_goal_status() == "PAUSED":
+                    if nav_task.current_goal_status() == "PAUSED":
                         self.galileo_status.targetStatus = 2
-                    if self.monitor_server.nav_task.current_goal_status() == "ERROR":
+                    if nav_task.current_goal_status() == "ERROR":
                         self.galileo_status.targetStatus = -1
 
                 self.galileo_status.targetDistance = -1
-                if self.monitor_server.nav_task != None and \
-                        self.monitor_server.nav_task.current_goal_status() != "ERROR":
+                if nav_task is not None and \
+                        nav_task.current_goal_status() != "ERROR":
                     self.galileo_status.targetDistance = \
-                        self.monitor_server.nav_task.current_goal_distance()
-                    if self.monitor_server.nav_task.update_pose() != -1:
-                        self.galileo_status.currentPosX = self.monitor_server.nav_task.current_pose_stamped_map.pose.position.x
-                        self.galileo_status.currentPosY = self.monitor_server.nav_task.current_pose_stamped_map.pose.position.y
-                        current_oritation = self.monitor_server.nav_task.current_pose_stamped_map.pose.orientation
+                        nav_task.current_goal_distance()
+                    if nav_task.update_pose() != -1:
+                        self.galileo_status.currentPosX = nav_task.current_pose_stamped_map.pose.position.x
+                        self.galileo_status.currentPosY = nav_task.current_pose_stamped_map.pose.position.y
+                        current_oritation = nav_task.current_pose_stamped_map.pose.orientation
                         current_pose_q = [current_oritation.x, current_oritation.y,
                                         current_oritation.z, current_oritation.w]
                         self.galileo_status.currentAngle = euler_from_quaternion(current_pose_q)[

@@ -51,7 +51,6 @@ import rosservice
 
 
 TILT_PUB = None
-NAV_LASTTIME = None
 rplidar_flag = False
 
 def get_global_move_flag(moveEn):
