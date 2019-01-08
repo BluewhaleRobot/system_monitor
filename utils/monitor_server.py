@@ -82,6 +82,7 @@ class MonitorServer(threading.Thread):
 
         self.nav_task = None
         self.nav_guide_task = None
+        self.busy_flag = False
 
         rospy.loginfo("service started")
 
@@ -118,7 +119,12 @@ class MonitorServer(threading.Thread):
         self.stop()
 
     def parse_data(self, cmds):
-        res = None
+        # 等待退出busy状态，最长等待3分钟
+        wait_busy_count = 3 * 60 * 100
+        while self.busy_flag and wait_busy_count > 0:
+            time.sleep(0.01)
+            wait_busy_count -= 1
+        self.busy_flag = True
         time_now = rospy.Time.now()
         for count in range(0, len(cmds)):
             if len(cmds[count]) > 0:
@@ -294,9 +300,11 @@ class MonitorServer(threading.Thread):
                         self.tilt_pub.publish(tilt_degree)
                         if self.nav_thread.stopped():
                             rospy.logwarn("巡检状态未启动")
+                            self.busy_flag = False
                             return
                         if self.nav_task.loop_running_flag:
                             rospy.logwarn("已经开始巡检")
+                            self.busy_flag = False
                             return
                         self.nav_task.start_loop()
                     if cmds[count][1] == 6:
@@ -343,12 +351,12 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("r"):
                     if self.nav_task is not None:
                         self.nav_task.reset_goals()
-                        time.sleep(2) # wait for reset complete
                 
                 # set loop and sleep time
                 if cmds[count][0] == ord("m") and cmds[count][1] == 5:
                     if self.nav_thread.stopped():
                         rospy.logwarn("巡检状态未启动")
+                        self.busy_flag = False
                         return
                     if self.nav_task is not None:
                         if not self.nav_task.loop_running_flag:
@@ -359,8 +367,7 @@ class MonitorServer(threading.Thread):
                             self.nav_task.start_loop()
                         else:
                             self.nav_task.sleep_time = cmds[count][2]
-
-        return res
+        self.busy_flag = False
 
     def sendto(self, data):
         try:

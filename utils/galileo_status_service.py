@@ -203,6 +203,10 @@ class GalileoStatusService(threading.Thread):
                 self.galileo_status.header.frame_id = "map"
                 self.galileo_status.header.stamp = rospy.Time.now()
 
+                self.galileo_status.busyStatus = 0
+                if self.monitor_server.busy_flag:
+                    self.galileo_status.busyStatus = 1
+
                 # reset old status
                 now = int(time.time() * 1000)
                 if now - self.visual_status_time > 1000:

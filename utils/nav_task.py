@@ -322,7 +322,7 @@ class NavigationTask():
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
-        self.start_load_targets()
+        self.load_targets_task()
 
     def loop_task(self):
         # 获取当前最近的位置
