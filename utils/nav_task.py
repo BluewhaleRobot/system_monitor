@@ -70,6 +70,7 @@ class NavigationTask():
         self.sleep_time = 1
         self.last_speed = None
         self.load_targets_exited_flag = True
+        self.running_flag = True
 
         def get_odom(odom):
             with self.status_lock:
@@ -135,7 +136,7 @@ class NavigationTask():
             # 转至map坐标系
             rospy.loginfo("获取ORB_SLAM/World->TF map")
             tf_flag = False
-            while not tf_flag and not rospy.is_shutdown():
+            while not tf_flag and not rospy.is_shutdown() and self.running_flag:
                 try:
                     t = rospy.Time(0)
                     self.listener.waitForTransform("ORB_SLAM/World", "map", t,
@@ -146,6 +147,9 @@ class NavigationTask():
                     tf_flag = False
                     rospy.logwarn("获取TF失败 ORB_SLAM/World->map")
                     rospy.logwarn(e)
+            if not self.running_flag:
+                self.load_targets_exited_flag = True
+                return
             rospy.loginfo("获取TF 成功 ORB_SLAM/World->map")
             waypoint = self.listener.transformPose(
                 "map", pose_in_world)
@@ -190,6 +194,7 @@ class NavigationTask():
         rospy.sleep(2)
         # Stop the robot
         self.cmd_vel_pub.publish(Twist())
+        self.running_flag = False
         rospy.sleep(1)
 
     def set_goal(self, goal_id):
@@ -330,7 +335,7 @@ class NavigationTask():
         rospy.loginfo("获取TF")
         tf_flag = False
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
-        while not tf_flag and not rospy.is_shutdown():
+        while not tf_flag and not rospy.is_shutdown() and self.running_flag:
             try:
                 now = rospy.Time.now()
                 self.listener.waitForTransform("map", "odom", now,
@@ -341,6 +346,9 @@ class NavigationTask():
                 tf_flag = False
                 rospy.logwarn("获取TF失败")
                 rospy.logwarn(e)
+        if not self.running_flag:
+            self.loop_exited_flag = True
+            return
         rospy.loginfo("获取TF 成功")
         self.current_pose_stamped.header.stamp = now
         if not tf_flag:
@@ -393,7 +401,7 @@ class NavigationTask():
 
         next_index = [waypoint.pose for waypoint in self.waypoints].index(
             next_target)
-        while not rospy.is_shutdown() and self.loop_running_flag:
+        while not rospy.is_shutdown() and self.loop_running_flag and self.running_flag:
             rospy.loginfo("next goal " + str(next_index))
             self.set_goal(next_index)
 
@@ -405,13 +413,16 @@ class NavigationTask():
                 time.sleep(1)
                 self.set_goal(next_index)
 
-            while not rospy.is_shutdown() and self.loop_running_flag:
+            while not rospy.is_shutdown() and self.loop_running_flag and self.running_flag:
                 if self.goal_status == "FREE":
                     break
                 if not self.loop_running_flag:
                     self.loop_exited_flag = True
                     return
                 time.sleep(0.5)
+            if not self.running_flag:
+                self.loop_exited_flag = True
+                return
             
             next_index += 1
             next_index = next_index % len(self.waypoints)

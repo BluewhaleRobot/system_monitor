@@ -313,8 +313,14 @@ class MonitorServer(threading.Thread):
                             self.nav_task.stop_loop()
 
                 elif cmds[count][0] == ord('g'):
+                    if self.nav_task is None:
+                        self.busy_flag = False
+                        return
                     self.nav_task.set_goal(cmds[count][1])
                 elif cmds[count][0] == ord('i'):
+                    if self.nav_task is None:
+                        self.busy_flag = False
+                        return
                     if cmds[count][1] == 0:
                         self.nav_task.pause()
                     if cmds[count][1] == 1:
