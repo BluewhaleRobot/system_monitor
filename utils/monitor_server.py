@@ -343,6 +343,7 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("r"):
                     if self.nav_task is not None:
                         self.nav_task.reset_goals()
+                        time.sleep(2) # wait for reset complete
                 
                 # set loop and sleep time
                 if cmds[count][0] == ord("m") and cmds[count][1] == 5:
