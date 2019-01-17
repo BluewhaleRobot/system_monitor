@@ -451,12 +451,12 @@ class NavigationTask():
         nearest_point = self.closest_node(target_point_2d, nav_path_points_2d)
         # 找距离此路径点最近的其他路径点
         nav_path_points_2d_filterd = filter(
-            lambda point: point[0] != target_point_2d[0] and point[1] != target_point_2d[1], nav_path_points_2d)
+            lambda point: point[0] != target_point_2d[0] or point[1] != target_point_2d[1], nav_path_points_2d)
         nearest_point_2 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
         # 距此路径点第二近点
         nav_path_points_2d_filterd = filter(
-            lambda point: point[0] != nearest_point_2[0] and point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
+            lambda point: point[0] != nearest_point_2[0] or point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
         nearest_point_3 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
 
