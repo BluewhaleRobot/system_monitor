@@ -61,15 +61,16 @@ class NavigationTask():
         rospy.loginfo("Connected to move base server")
         rospy.loginfo("Starting navigation test")
         self.current_pose_stamped = None
+        self.current_pose_stamped_map = None
         self.status_lock = threading.Lock()
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.loop_running_flag = False
         self.loop_exited_flag = True
         self.sleep_time = 1
-        self.track_init_flag = False
         self.last_speed = None
         self.load_targets_exited_flag = True
+        self.running_flag = True
 
         def get_odom(odom):
             with self.status_lock:
@@ -135,7 +136,7 @@ class NavigationTask():
             # 转至map坐标系
             rospy.loginfo("获取ORB_SLAM/World->TF map")
             tf_flag = False
-            while not tf_flag and not rospy.is_shutdown():
+            while not tf_flag and not rospy.is_shutdown() and self.running_flag:
                 try:
                     t = rospy.Time(0)
                     self.listener.waitForTransform("ORB_SLAM/World", "map", t,
@@ -146,6 +147,9 @@ class NavigationTask():
                     tf_flag = False
                     rospy.logwarn("获取TF失败 ORB_SLAM/World->map")
                     rospy.logwarn(e)
+            if not self.running_flag:
+                self.load_targets_exited_flag = True
+                return
             rospy.loginfo("获取TF 成功 ORB_SLAM/World->map")
             waypoint = self.listener.transformPose(
                 "map", pose_in_world)
@@ -164,6 +168,8 @@ class NavigationTask():
             req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
+            if len(res.plan.poses) > 10:
+                res.plan.poses = res.plan.poses[:-4]
             plan_path_2d = [[point.pose.position.x, point.pose.position.y]
                             for point in res.plan.poses]
             angle = self.get_target_direction(
@@ -188,6 +194,7 @@ class NavigationTask():
         rospy.sleep(2)
         # Stop the robot
         self.cmd_vel_pub.publish(Twist())
+        self.running_flag = False
         rospy.sleep(1)
 
     def set_goal(self, goal_id):
@@ -256,15 +263,27 @@ class NavigationTask():
 
         latest = rospy.Time(0)
         self.current_pose_stamped.header.stamp = latest
+        self.current_pose_stamped.header.frame_id = "odom"
         try:
-            self.current_pose_stamped = self.listener.transformPose(
+            self.current_pose_stamped_map = self.listener.transformPose(
                 "/map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
-        current_pose = self.current_pose_stamped.pose
         mgoal = self.waypoints[self.current_goal_id].pose
-        return self.pose_distance(mgoal, current_pose)
+        return self.pose_distance(mgoal, self.current_pose_stamped_map.pose)
+
+    def update_pose(self):
+        latest = rospy.Time(0)
+        self.current_pose_stamped.header.stamp = latest
+        try:
+            self.current_pose_stamped.header.frame_id = "odom"
+            self.current_pose_stamped_map = self.listener.transformPose(
+                "/map", self.current_pose_stamped)
+        except (tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException, tf.Exception):
+            return -1
+        return self.current_pose_stamped_map
 
     def pose_distance(self, pose1, pose2):
         return math.sqrt(math.pow((pose1.position.x - pose2.position.x), 2)
@@ -308,7 +327,7 @@ class NavigationTask():
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
-        self.start_load_targets()
+        self.load_targets_task()
 
     def loop_task(self):
         # 获取当前最近的位置
@@ -316,7 +335,7 @@ class NavigationTask():
         rospy.loginfo("获取TF")
         tf_flag = False
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
-        while not tf_flag and not rospy.is_shutdown():
+        while not tf_flag and not rospy.is_shutdown() and self.running_flag:
             try:
                 now = rospy.Time.now()
                 self.listener.waitForTransform("map", "odom", now,
@@ -327,14 +346,17 @@ class NavigationTask():
                 tf_flag = False
                 rospy.logwarn("获取TF失败")
                 rospy.logwarn(e)
+        if not self.running_flag:
+            self.loop_exited_flag = True
+            return
         rospy.loginfo("获取TF 成功")
         self.current_pose_stamped.header.stamp = now
         if not tf_flag:
             return
         with self.status_lock:
-            self.current_pose_stamped = self.listener.transformPose(
+            self.current_pose_stamped_map = self.listener.transformPose(
                 "/map", self.current_pose_stamped)
-        current_pose = self.current_pose_stamped.pose
+        current_pose = self.current_pose_stamped_map.pose
         current_pose_q = [current_pose.orientation.x, current_pose.orientation.y,
                           current_pose.orientation.z, current_pose.orientation.w]
         theta_current = euler_from_quaternion(current_pose_q)[2]
@@ -379,20 +401,29 @@ class NavigationTask():
 
         next_index = [waypoint.pose for waypoint in self.waypoints].index(
             next_target)
-        while not rospy.is_shutdown() and self.loop_running_flag:
+        while not rospy.is_shutdown() and self.loop_running_flag and self.running_flag:
             rospy.loginfo("next goal " + str(next_index))
             self.set_goal(next_index)
-            # 等待goal的状态
-            time.sleep(1)
-            while not rospy.is_shutdown():
-                if self.goal_status == "FREE" and \
-                        self.current_goal_distance() < 0.2 and \
-                        self.current_goal_distance() > 0:
+
+            # 设置导航点失败，可能由于系统尚未初始化
+            # 未处于工作状态，且未处于任务完成状态
+            while self.goal_status != "WORKING" and not \
+                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2 \
+                    and self.current_goal_distance() > 0):
+                time.sleep(1)
+                self.set_goal(next_index)
+
+            while not rospy.is_shutdown() and self.loop_running_flag and self.running_flag:
+                if self.goal_status == "FREE":
                     break
                 if not self.loop_running_flag:
                     self.loop_exited_flag = True
                     return
                 time.sleep(0.5)
+            if not self.running_flag:
+                self.loop_exited_flag = True
+                return
+            
             next_index += 1
             next_index = next_index % len(self.waypoints)
             sleep_count = 0
@@ -420,20 +451,20 @@ class NavigationTask():
         nearest_point = self.closest_node(target_point_2d, nav_path_points_2d)
         # 找距离此路径点最近的其他路径点
         nav_path_points_2d_filterd = filter(
-            lambda point: point[0] != target_point_2d[0] and point[1] != target_point_2d[1], nav_path_points_2d)
+            lambda point: point[0] != target_point_2d[0] or point[1] != target_point_2d[1], nav_path_points_2d)
         nearest_point_2 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
         # 距此路径点第二近点
         nav_path_points_2d_filterd = filter(
-            lambda point: point[0] != nearest_point_2[0] and point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
+            lambda point: point[0] != nearest_point_2[0] or point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
         nearest_point_3 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
 
         def f_1(x, A, B):
             return A*x + B
-        A1, B1 = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
+        A1, _ = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
                                     [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
-        if nearest_point_3[0] >= nearest_point[0]:
+        if (nearest_point_3[0] - nearest_point[0]) * A1 >= 0:
             return (1 / A1, 1)
         else:
             return (-1 / A1, -1)
