@@ -39,6 +39,7 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_conjugate
+import rosparam
 
 from config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
@@ -177,6 +178,7 @@ class NavigationTask():
             q_angle = quaternion_from_euler(0, 0, math.atan2(
                 angle[1], angle[0]) + math.pi, axes='sxyz')
             waypoint.pose.orientation = Quaternion(*q_angle)
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def start_load_targets(self):
         if self.load_targets_exited_flag:
@@ -323,11 +325,13 @@ class NavigationTask():
             "ORB_SLAM/World", waypoint_stamped)
         target_point.header.stamp = rospy.Time.now()
         self.target_points.append(target_point)
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.load_targets_task()
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def loop_task(self):
         # 获取当前最近的位置
