@@ -44,3 +44,6 @@ ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' +
     '/opt/ros/kinetic/stacks:' + \
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
 SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.log"
+IOT_SECRET = "IaRvYwW1q1VSmHlLEqiPa23iyMOqndmm"
+IOT_KEY = "a1Eb29fVWHG"
+IOT_PASSWORD = "xiaoqiang"
