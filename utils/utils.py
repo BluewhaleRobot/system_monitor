@@ -32,7 +32,7 @@ import signal
 import threading
 import time
 
-from config import SHARPLINK_LOG_FILE
+from utils.config import SHARPLINK_LOG_FILE
 
 TIMEOUT = 5
 

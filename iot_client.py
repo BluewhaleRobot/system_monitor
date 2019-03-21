@@ -8,7 +8,34 @@ import json
 import sys
 from utils.config import IOT_KEY, IOT_SECRET, IOT_PASSWORD
 from utils.utils import get_my_id
+import rospy
+from galileo_serial_server.msg import GalileoStatus
 
+
+def galileo_status_to_json(galileo_status):
+    return json.dumps({
+        "timestamp": galileo_status.header.stamp.to_nsec() / 1000 / 1000,
+        "angleGoalStatus": galileo_status.angleGoalStatus,
+        "busyStatus": galileo_status.busyStatus,
+        "chargeStatus": galileo_status.chargeStatus,
+        "controlSpeedTheta": galileo_status.controlSpeedTheta,
+        "controlSpeedX": galileo_status.controlSpeedX,
+        "currentAngle": galileo_status.currentAngle,
+        "currentPosX": galileo_status.currentPosX,
+        "currentPosY": galileo_status.currentPosY,
+        "currentSpeedTheta": galileo_status.currentSpeedTheta,
+        "currentSpeedX": galileo_status.currentSpeedX,
+        "gbaStatus": galileo_status.gbaStatus,
+        "gcStatus": galileo_status.gcStatus,
+        "loopStatus": galileo_status.loopStatus,
+        "mapStatus": galileo_status.mapStatus,
+        "navStatus": galileo_status.navStatus,
+        "power": galileo_status.power,
+        "targetDistance": galileo_status.targetDistance,
+        "targetNumID": galileo_status.targetNumID,
+        "targetStatus": galileo_status.targetStatus,
+        "visualStatus": galileo_status.visualStatus,
+    }, indent=4)
 
 class IotClient():
 
@@ -17,6 +44,7 @@ class IotClient():
         self.on_galileo_cmds = None
         self.on_status_update = None
         self.secret = IOT_SECRET
+        self.skip_count = 10
         self.lk = linkkit.LinkKit(
             host_name="cn-shanghai",
             product_key=IOT_KEY,
@@ -27,10 +55,11 @@ class IotClient():
         self.connect_flag = False
 
         def on_connect(session_flag, rc, userdata):
+            print("Connected")
             self.connect_flag = True
 
         def on_disconnect(rc, userdata):
-            pass
+            print("Disconnected")
 
         self.lk.on_connect = on_connect
         self.lk.on_disconnect = on_disconnect
@@ -81,11 +110,23 @@ class IotClient():
     def set_on_status_update(self, cb):
         self.on_status_update = cb
 
+    def status_received(self, status):
+        if self.skip_count >= 0:
+            self.skip_count -= 1
+            return
+        self.skip_count = 10
+        print("publish status")
+        self.publish_status(galileo_status_to_json(status))
+
 
 if __name__ == "__main__":
     client = IotClient(get_my_id())
     def on_cmd_received(cmd):
+        print("command received")
         pass
     client.set_on_galileo_cmds(on_cmd_received)
-    while True:
+    rospy.init_node("iot_client")
+    
+    rospy.Subscriber("/galileo/status", GalileoStatus, client.status_received)
+    while not rospy.is_shutdown():
         time.sleep(1)
