@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # encoding=utf-8
 
-from linkkit import linkkit
+import utils.linkkit as linkkit
+# from linkkit import linkkit
 import time
 import requests
 import json
@@ -10,6 +11,8 @@ from utils.config import IOT_KEY, IOT_SECRET, IOT_PASSWORD
 from utils.utils import get_my_id
 import rospy
 from galileo_serial_server.msg import GalileoStatus
+import logging
+logging.basicConfig()
 
 
 def galileo_status_to_json(galileo_status):
@@ -44,12 +47,13 @@ class IotClient():
         self.on_galileo_cmds = None
         self.on_status_update = None
         self.secret = IOT_SECRET
-        self.skip_count = 10
+        self.skip_count = 30
         self.lk = linkkit.LinkKit(
             host_name="cn-shanghai",
             product_key=IOT_KEY,
             device_name=self.id_to_device_name(),
             device_secret=self.secret)
+        # self.lk.enable_logger(logging.DEBUG)
         
 
         self.connect_flag = False
@@ -105,7 +109,7 @@ class IotClient():
 
     def publish_status(self, status):
         _rc, _mid = self.lk.publish_topic(
-            self.lk.to_full_topic("user/galileo/status"), status)
+            self.lk.to_full_topic("user/galileo/status"), status, qos=0)
 
     def set_on_status_update(self, cb):
         self.on_status_update = cb
@@ -114,7 +118,7 @@ class IotClient():
         if self.skip_count >= 0:
             self.skip_count -= 1
             return
-        self.skip_count = 10
+        self.skip_count = 5
         print("publish status")
         self.publish_status(galileo_status_to_json(status))
 
