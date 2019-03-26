@@ -10,7 +10,9 @@ import sys
 from utils.config import IOT_KEY, IOT_SECRET, IOT_PASSWORD
 from utils.utils import get_my_id
 import rospy
-from galileo_serial_server.msg import GalileoStatus
+from std_msgs.msg import String
+from geometry_msgs.msg import Twist
+from galileo_serial_server.msg import GalileoStatus, GalileoNativeCmds
 import logging
 logging.basicConfig()
 
@@ -46,6 +48,9 @@ class IotClient():
         self.id = id
         self.on_galileo_cmds = None
         self.on_status_update = None
+        self.on_test = None
+        self.on_audio = None
+        self.on_speed = None
         self.secret = IOT_SECRET
         self.skip_count = 30
         self.lk = linkkit.LinkKit(
@@ -76,6 +81,12 @@ class IotClient():
         if is_robot:
             _rc, _mid = self.lk.subscribe_topic(
                 self.lk.to_full_topic("user/galileo/cmds"))
+            self.lk.subscribe_topic(
+                self.lk.to_full_topic("user/test"))
+            self.lk.subscribe_topic(
+                self.lk.to_full_topic("user/speed"))
+            self.lk.subscribe_topic(
+                self.lk.to_full_topic("user/audio"))
             self.lk.subscribe_rrpc_topic("/user/check_permission")
         else:
             _rc, _mid = self.lk.subscribe_topic(
@@ -86,6 +97,12 @@ class IotClient():
                 self.on_galileo_cmds(payload)
             if topic == self.lk.to_full_topic("user/galileo/status") and self.on_status_update is not None:
                 self.on_status_update(payload)
+            if topic == self.lk.to_full_topic("user/test") and self.on_test is not None:
+                self.on_test(payload)
+            if topic == self.lk.to_full_topic("user/audio") and self.on_audio is not None:
+                self.on_audio(payload)
+            if topic == self.lk.to_full_topic("user/speed") and self.on_speed is not None:
+                self.on_speed(payload)
         
         def on_rrpc_msg(rrpc_id, topic, payload, qos, userdata):
             req = json.loads(payload.decode())
@@ -118,19 +135,52 @@ class IotClient():
         if self.skip_count >= 0:
             self.skip_count -= 1
             return
-        self.skip_count = 5
-        print("publish status")
+        self.skip_count = 30
         self.publish_status(galileo_status_to_json(status))
+    
+    def set_on_test(self, cb):
+        self.on_test = cb
+
+    def set_on_audio(self, cb):
+        self.on_audio = cb
+
+    def set_on_speed(self, cb):
+        self.on_speed = cb
 
 
 if __name__ == "__main__":
-    client = IotClient(get_my_id())
-    def on_cmd_received(cmd):
-        print("command received")
-        pass
-    client.set_on_galileo_cmds(on_cmd_received)
     rospy.init_node("iot_client")
+    client = IotClient(get_my_id())
+    galileo_cmd_pub = rospy.Publisher("/galileo/cmds", GalileoNativeCmds, queue_size=1)
+    test_pub = rospy.Publisher("/pub_test", String, queue_size=1)
+    audio_pub = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
+    speed_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+
+    def on_cmd_received(cmd):
+        galileo_cmd = GalileoNativeCmds()
+        galileo_cmd.header.stamp = rospy.Time.now()
+        galileo_cmd.length = len(cmd)
+        galileo_cmd.data = cmd
+        galileo_cmd_pub.publish(galileo_cmd)
+
+    def on_test_received(msg):
+        test_pub.publish(msg)
     
+    def on_audio_received(msg):
+        audio_pub.publish(msg)
+    
+    def on_speed_received(msg):
+        msg = json.loads(msg)
+        speed_twist = Twist()
+        speed_twist.linear.x = msg["vLinear"]
+        speed_twist.angular.z = msg["vAngle"]
+        speed_pub.publish(speed_twist)
+
+    client.set_on_galileo_cmds(on_cmd_received)
+    client.set_on_test(on_test_received)
+    client.set_on_audio(on_audio_received)
+    client.set_on_speed(on_speed_received)
+
     rospy.Subscriber("/galileo/status", GalileoStatus, client.status_received)
     while not rospy.is_shutdown():
         time.sleep(1)
