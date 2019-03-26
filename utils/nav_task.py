@@ -112,26 +112,28 @@ class NavigationTask():
                 nav_data_str = nav_data_file.readline()
 
         self.waypoints = list()
-        nav_path_points = []
-        with open("/home/xiaoqiang/slamdb/path.csv", "r") as nav_data_file:
-            nav_data_str = nav_data_file.readline()
-            while len(nav_data_str) != 0:
-                pos_x = float(nav_data_str.split(" ")[0])
-                pos_y = float(nav_data_str.split(" ")[1])
-                pos_z = float(nav_data_str.split(" ")[2])
-                nav_path_points.append([pos_x, pos_y, pos_z])
-                nav_data_str = nav_data_file.readline()
-        nav_path_points_2d = [[point[0], point[2]]
-                              for point in nav_path_points]
+        # nav_path_points = []
+        # with open("/home/xiaoqiang/slamdb/path.csv", "r") as nav_data_file:
+        #     nav_data_str = nav_data_file.readline()
+        #     while len(nav_data_str) != 0:
+        #         pos_x = float(nav_data_str.split(" ")[0])
+        #         pos_y = float(nav_data_str.split(" ")[1])
+        #         pos_z = float(nav_data_str.split(" ")[2])
+        #         nav_path_points.append([pos_x, pos_y, pos_z])
+        #         nav_data_str = nav_data_file.readline()
+        # nav_path_points_2d = [[point[0], point[2]]
+        #                       for point in nav_path_points]
         for point in self.target_points:
             pose_in_world = PoseStamped()
             pose_in_world.header.frame_id = "ORB_SLAM/World"
             pose_in_world.header.stamp = rospy.Time(0)
             pose_in_world.pose.position = Point(point[0], point[1], point[2])
-            axis = self.get_target_direction(
-                [point[0], point[2]], nav_path_points_2d)
+            # axis = self.get_target_direction(
+            #     [point[0], point[2]], nav_path_points_2d)
+            # q_angle = quaternion_from_euler(
+            #     math.pi / 2, -math.atan2(axis[1], axis[0]), 0, axes='sxyz')
             q_angle = quaternion_from_euler(
-                math.pi / 2, -math.atan2(axis[1], axis[0]), 0, axes='sxyz')
+                0, 0, 0, axes='sxyz')
             pose_in_world.pose.orientation = Quaternion(*q_angle)
 
             # 转至map坐标系
@@ -162,10 +164,10 @@ class NavigationTask():
         rospy.loginfo("waiting for move_base/make_plan service succeed")
         make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
         for waypoint in self.waypoints:
-            if waypoint == self.waypoints[0]:
-                continue
             req = GetPlanRequest()
             req.start = self.waypoints[0]
+            if waypoint == self.waypoints[0]:
+                req.start = self.waypoints[1]
             req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
