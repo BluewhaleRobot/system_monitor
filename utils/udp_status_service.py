@@ -59,7 +59,6 @@ class UDPStatusService(threading.Thread):
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.odom_flag = False
-        self.image_flag = False
 
         def update_odom(odom):
             self.odom_flag = True
@@ -67,16 +66,10 @@ class UDPStatusService(threading.Thread):
             self.robot_pose_stamped.pose = odom.pose.pose  # 更新坐标
             self.robot_pose_stamped.header = odom.header  # 更新坐标
 
-        def update_camera_status(status):
-            self.image_flag = True
-
         self.odom_sub = rospy.Subscriber("/bWmono/Odom", Odometry, update_odom)
-        self.camera_sub = rospy.Subscriber(
-            "/camera_node/camera_info", rospy.AnyMsg, update_camera_status)
 
     def stop(self):
         self.odom_sub.unregister()
-        self.camera_sub.unregister()
         self._stop.set()
 
     def stopped(self):
@@ -128,8 +121,8 @@ class UDPStatusService(threading.Thread):
                         statu0 = 0x01  # 导航状态
                     else:
                         statu0 = 0x00
-                    if self.image_flag:
-                        statu1 = 0x02  # 视觉摄像头
+                    if self.galileo_status.mapStatus:
+                        statu1 = 0x02  # 建图状态
                     else:
                         statu1 = 0x00
                     if self.galileo_status.visualStatus != -1:

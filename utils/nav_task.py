@@ -45,6 +45,7 @@ from config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
 from scipy import optimize
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
+from actionlib_msgs.msg import GoalStatus
 
 
 class NavigationTask():
@@ -55,6 +56,7 @@ class NavigationTask():
         self.tf_trans = TF_TRANS
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
+        self.audio_pub = rospy.Publisher('/xiaoqiang_tts/text', String, queue_size=0)
         self.move_base = actionlib.SimpleActionClient("move_base",
                                                       MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
@@ -112,26 +114,11 @@ class NavigationTask():
                 nav_data_str = nav_data_file.readline()
 
         self.waypoints = list()
-        # nav_path_points = []
-        # with open("/home/xiaoqiang/slamdb/path.csv", "r") as nav_data_file:
-        #     nav_data_str = nav_data_file.readline()
-        #     while len(nav_data_str) != 0:
-        #         pos_x = float(nav_data_str.split(" ")[0])
-        #         pos_y = float(nav_data_str.split(" ")[1])
-        #         pos_z = float(nav_data_str.split(" ")[2])
-        #         nav_path_points.append([pos_x, pos_y, pos_z])
-        #         nav_data_str = nav_data_file.readline()
-        # nav_path_points_2d = [[point[0], point[2]]
-        #                       for point in nav_path_points]
         for point in self.target_points:
             pose_in_world = PoseStamped()
             pose_in_world.header.frame_id = "ORB_SLAM/World"
             pose_in_world.header.stamp = rospy.Time(0)
             pose_in_world.pose.position = Point(point[0], point[1], point[2])
-            # axis = self.get_target_direction(
-            #     [point[0], point[2]], nav_path_points_2d)
-            # q_angle = quaternion_from_euler(
-            #     math.pi / 2, -math.atan2(axis[1], axis[0]), 0, axes='sxyz')
             q_angle = quaternion_from_euler(
                 0, 0, 0, axes='sxyz')
             pose_in_world.pose.orientation = Quaternion(*q_angle)
@@ -167,8 +154,11 @@ class NavigationTask():
             req = GetPlanRequest()
             req.start = self.waypoints[0]
             if waypoint == self.waypoints[0]:
+                rospy.loginfo("Set 0 point direction")
                 req.start = self.waypoints[1]
-            req.goal = waypoint
+                req.goal = self.waypoints[0] # 修复0号点方向问题
+            else:
+                req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
             if len(res.plan.poses) > 10:
@@ -177,8 +167,13 @@ class NavigationTask():
                             for point in res.plan.poses]
             angle = self.get_target_direction(
                 [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
-            q_angle = quaternion_from_euler(0, 0, math.atan2(
-                angle[1], angle[0]) + math.pi, axes='sxyz')
+            if waypoint == self.waypoints[0]:
+                # 0号点头朝向1号点
+                q_angle = quaternion_from_euler(0, 0, math.atan2(
+                angle[1], angle[0]), axes='sxyz')
+            else:
+                q_angle = quaternion_from_euler(0, 0, math.atan2(
+                    angle[1], angle[0]) + math.pi, axes='sxyz')
             waypoint.pose.orientation = Quaternion(*q_angle)
         rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
@@ -216,6 +211,11 @@ class NavigationTask():
 
         def done_cb(status, result):
             self.goal_status = "FREE"
+            if status == GoalStatus.SUCCEEDED:
+                target_names = ["A", "B", "C", "D", "E", "F", "G"]
+                target_desp = ["蓝鲸智能机器人为您服务", "等待乘客上车，十秒后出发", "正在加油，十秒后加油完成，完成后出发", "感谢乘坐本次班车，蓝鲸智能机器人为您服务"]
+                self.audio_pub.publish("到达{name}号目标点，{target_desp}"
+                    .format(name=target_names[goal_id], target_desp=target_desp[goal_id]))
         # wait for 1s
         if not self.move_base.wait_for_server(rospy.Duration(1)):
             self.goal_status = "ERROR"
