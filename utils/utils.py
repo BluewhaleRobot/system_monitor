@@ -25,14 +25,13 @@
 # Author: Randoms, Xiefusheng
 #
 
-
+from __future__ import absolute_import
 import os
 import re
 import signal
 import threading
 import time
-
-from config import SHARPLINK_LOG_FILE
+from .config import SHARPLINK_LOG_FILE
 
 TIMEOUT = 5
 

@@ -31,7 +31,7 @@ from getmac import get_mac_address
 
 import rospy
 
-from utils.config import BROADCAST_PORT_V2
+from utils.config import BROADCAST_PORT_V2, VERSION
 from utils.utils import get_my_id
 
 if __name__ == "__main__":
@@ -47,6 +47,7 @@ if __name__ == "__main__":
             "id": get_my_id(),
             "port": 11311,
             "mac": get_mac_address(),
+            "version": VERSION,
         }, indent=4)
         # 发送广播包
         try:

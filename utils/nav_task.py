@@ -39,6 +39,7 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_conjugate
+import rosparam
 
 from config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
@@ -111,26 +112,13 @@ class NavigationTask():
                 nav_data_str = nav_data_file.readline()
 
         self.waypoints = list()
-        nav_path_points = []
-        with open("/home/xiaoqiang/slamdb/path.csv", "r") as nav_data_file:
-            nav_data_str = nav_data_file.readline()
-            while len(nav_data_str) != 0:
-                pos_x = float(nav_data_str.split(" ")[0])
-                pos_y = float(nav_data_str.split(" ")[1])
-                pos_z = float(nav_data_str.split(" ")[2])
-                nav_path_points.append([pos_x, pos_y, pos_z])
-                nav_data_str = nav_data_file.readline()
-        nav_path_points_2d = [[point[0], point[2]]
-                              for point in nav_path_points]
         for point in self.target_points:
             pose_in_world = PoseStamped()
             pose_in_world.header.frame_id = "ORB_SLAM/World"
             pose_in_world.header.stamp = rospy.Time(0)
             pose_in_world.pose.position = Point(point[0], point[1], point[2])
-            axis = self.get_target_direction(
-                [point[0], point[2]], nav_path_points_2d)
             q_angle = quaternion_from_euler(
-                math.pi / 2, -math.atan2(axis[1], axis[0]), 0, axes='sxyz')
+                0, 0, 0, axes='sxyz')
             pose_in_world.pose.orientation = Quaternion(*q_angle)
 
             # 转至map坐标系
@@ -161,11 +149,14 @@ class NavigationTask():
         rospy.loginfo("waiting for move_base/make_plan service succeed")
         make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
         for waypoint in self.waypoints:
-            if waypoint == self.waypoints[0]:
-                continue
             req = GetPlanRequest()
             req.start = self.waypoints[0]
-            req.goal = waypoint
+            if waypoint == self.waypoints[0]:
+                rospy.loginfo("Set 0 point direction")
+                req.start = self.waypoints[1]
+                req.goal = self.waypoints[0]  # 修复0号点方向问题
+            else:
+                req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
             if len(res.plan.poses) > 10:
@@ -174,9 +165,15 @@ class NavigationTask():
                             for point in res.plan.poses]
             angle = self.get_target_direction(
                 [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
-            q_angle = quaternion_from_euler(0, 0, math.atan2(
-                angle[1], angle[0]) + math.pi, axes='sxyz')
+            if waypoint == self.waypoints[0]:
+                # 0号点头朝向1号点
+                q_angle = quaternion_from_euler(0, 0, math.atan2(
+                    angle[1], angle[0]), axes='sxyz')
+            else:
+                q_angle = quaternion_from_euler(0, 0, math.atan2(
+                    angle[1], angle[0]) + math.pi, axes='sxyz')
             waypoint.pose.orientation = Quaternion(*q_angle)
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def start_load_targets(self):
         if self.load_targets_exited_flag:
@@ -323,11 +320,13 @@ class NavigationTask():
             "ORB_SLAM/World", waypoint_stamped)
         target_point.header.stamp = rospy.Time.now()
         self.target_points.append(target_point)
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def reset_goals(self):
         self.current_goal_id = -1
         self.goal_status = "FREE"
         self.load_targets_task()
+        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def loop_task(self):
         # 获取当前最近的位置
@@ -408,7 +407,7 @@ class NavigationTask():
             # 设置导航点失败，可能由于系统尚未初始化
             # 未处于工作状态，且未处于任务完成状态
             while self.goal_status != "WORKING" and not \
-                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2 \
+                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2
                     and self.current_goal_distance() > 0):
                 time.sleep(1)
                 self.set_goal(next_index)
@@ -423,7 +422,7 @@ class NavigationTask():
             if not self.running_flag:
                 self.loop_exited_flag = True
                 return
-            
+
             next_index += 1
             next_index = next_index % len(self.waypoints)
             sleep_count = 0
@@ -463,7 +462,7 @@ class NavigationTask():
         def f_1(x, A, B):
             return A*x + B
         A1, _ = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
-                                    [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
+                                   [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
         if (nearest_point_3[0] - nearest_point[0]) * A1 >= 0:
             return (1 / A1, 1)
         else:
