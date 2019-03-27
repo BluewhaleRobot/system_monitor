@@ -5,5 +5,6 @@ bool orbInitStatus
 bool orbScaleStatus
 bool orbGCFlag
 bool orbGBAFlag
+bool chargingStatus
 uint32 brightness
 float64 power
