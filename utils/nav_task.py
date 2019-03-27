@@ -56,7 +56,8 @@ class NavigationTask():
         self.tf_trans = TF_TRANS
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
-        self.audio_pub = rospy.Publisher('/xiaoqiang_tts/text', String, queue_size=0)
+        self.audio_pub = rospy.Publisher(
+            '/xiaoqiang_tts/text', String, queue_size=0)
         self.move_base = actionlib.SimpleActionClient("move_base",
                                                       MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
@@ -156,7 +157,7 @@ class NavigationTask():
             if waypoint == self.waypoints[0]:
                 rospy.loginfo("Set 0 point direction")
                 req.start = self.waypoints[1]
-                req.goal = self.waypoints[0] # 修复0号点方向问题
+                req.goal = self.waypoints[0]  # 修复0号点方向问题
             else:
                 req.goal = waypoint
             req.tolerance = 0.1
@@ -170,7 +171,7 @@ class NavigationTask():
             if waypoint == self.waypoints[0]:
                 # 0号点头朝向1号点
                 q_angle = quaternion_from_euler(0, 0, math.atan2(
-                angle[1], angle[0]), axes='sxyz')
+                    angle[1], angle[0]), axes='sxyz')
             else:
                 q_angle = quaternion_from_euler(0, 0, math.atan2(
                     angle[1], angle[0]) + math.pi, axes='sxyz')
@@ -213,9 +214,11 @@ class NavigationTask():
             self.goal_status = "FREE"
             if status == GoalStatus.SUCCEEDED:
                 target_names = ["A", "B", "C", "D", "E", "F", "G"]
-                target_desp = ["蓝鲸智能机器人为您服务", "等待乘客上车，十秒后出发", "正在加油，十秒后加油完成，完成后出发", "感谢乘坐本次班车，蓝鲸智能机器人为您服务"]
-                self.audio_pub.publish("到达{name}号目标点，{target_desp}"
-                    .format(name=target_names[goal_id], target_desp=target_desp[goal_id]))
+                target_desp = ["蓝鲸智能机器人为您服务", "等待乘客上车，十秒后出发",
+                               "正在加油，十秒后加油完成，完成后出发", "感谢乘坐本次班车，蓝鲸智能机器人为您服务", "", "", "", "", "", ""]
+                if goal_id < len(target_names):
+                    self.audio_pub.publish("到达{name}号目标点，{target_desp}"
+                                       .format(name=target_names[goal_id], target_desp=target_desp[goal_id]))
         # wait for 1s
         if not self.move_base.wait_for_server(rospy.Duration(1)):
             self.goal_status = "ERROR"
@@ -414,7 +417,7 @@ class NavigationTask():
             # 设置导航点失败，可能由于系统尚未初始化
             # 未处于工作状态，且未处于任务完成状态
             while self.goal_status != "WORKING" and not \
-                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2 \
+                (self.goal_status == "FREE" and self.current_goal_distance() < 0.2
                     and self.current_goal_distance() > 0):
                 time.sleep(1)
                 self.set_goal(next_index)
@@ -429,7 +432,7 @@ class NavigationTask():
             if not self.running_flag:
                 self.loop_exited_flag = True
                 return
-            
+
             next_index += 1
             next_index = next_index % len(self.waypoints)
             sleep_count = 0
@@ -469,7 +472,7 @@ class NavigationTask():
         def f_1(x, A, B):
             return A*x + B
         A1, _ = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
-                                    [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
+                                   [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
         if (nearest_point_3[0] - nearest_point[0]) * A1 >= 0:
             return (1 / A1, 1)
         else:
