@@ -45,7 +45,6 @@ from config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
 from scipy import optimize
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
-from actionlib_msgs.msg import GoalStatus
 
 
 class NavigationTask():
@@ -56,8 +55,6 @@ class NavigationTask():
         self.tf_trans = TF_TRANS
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=0)
-        self.audio_pub = rospy.Publisher(
-            '/xiaoqiang_tts/text', String, queue_size=0)
         self.move_base = actionlib.SimpleActionClient("move_base",
                                                       MoveBaseAction)
         rospy.loginfo("Waiting for move_base action server...")
@@ -212,13 +209,6 @@ class NavigationTask():
 
         def done_cb(status, result):
             self.goal_status = "FREE"
-            if status == GoalStatus.SUCCEEDED:
-                target_names = ["A", "B", "C", "D", "E", "F", "G"]
-                target_desp = ["蓝鲸智能机器人为您服务", "等待乘客上车，十秒后出发",
-                               "正在加油，十秒后加油完成，完成后出发", "感谢乘坐本次班车，蓝鲸智能机器人为您服务", "", "", "", "", "", ""]
-                if goal_id < len(target_names):
-                    self.audio_pub.publish("到达{name}号目标点，{target_desp}"
-                                       .format(name=target_names[goal_id], target_desp=target_desp[goal_id]))
         # wait for 1s
         if not self.move_base.wait_for_server(rospy.Duration(1)):
             self.goal_status = "ERROR"
