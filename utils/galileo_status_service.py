@@ -30,10 +30,11 @@ import time
 
 import rospy
 from galileo_serial_server.msg import GalileoStatus
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int32
 from tf.transformations import euler_from_quaternion
+import tf
 
 
 class GalileoStatusService(threading.Thread):
@@ -61,6 +62,7 @@ class GalileoStatusService(threading.Thread):
         self.current_speed_time = int(time.time() * 1000)
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
+        self.listener = tf.TransformListener(True, rospy.Duration(10.0))
 
         # stop flag
         self._stop = threading.Event()
@@ -191,6 +193,32 @@ class GalileoStatusService(threading.Thread):
                         self.galileo_status.currentPosX = -1
                         self.galileo_status.currentPosY = -1
                         self.galileo_status.currentAngle = -1
+                elif not self.monitor_server.map_thread.stopped():
+                    # 处于建图状态
+                    # 获取map到baselink坐标变换
+                    latest = rospy.Time(0)
+                    current_pose_stamped = PoseStamped()
+                    current_pose_stamped.header.stamp = latest
+                    current_pose_stamped_map = None
+                    try:
+                        current_pose_stamped.header.frame_id = "base_link"
+                        current_pose_stamped_map = self.listener.transformPose(
+                            "/map", current_pose_stamped)
+                    except (tf.LookupException, tf.ConnectivityException,
+                            tf.ExtrapolationException, tf.Exception) as e:
+                        rospy.logwarn(e)
+                    if current_pose_stamped_map == None:
+                        self.galileo_status.currentPosX = -1
+                        self.galileo_status.currentPosY = -1
+                        self.galileo_status.currentAngle = -1
+                    else:
+                        self.galileo_status.currentPosX = current_pose_stamped_map.pose.position.x
+                        self.galileo_status.currentPosY = current_pose_stamped_map.pose.position.y
+                        current_oritation = current_pose_stamped_map.pose.orientation
+                        current_pose_q = [current_oritation.x, current_oritation.y,
+                                        current_oritation.z, current_oritation.w]
+                        self.galileo_status.currentAngle = euler_from_quaternion(current_pose_q)[
+                            2]
                 else:
                     self.galileo_status.currentPosX = -1
                     self.galileo_status.currentPosY = -1
