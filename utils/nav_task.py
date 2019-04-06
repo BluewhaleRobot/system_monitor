@@ -114,34 +114,13 @@ class NavigationTask():
         self.waypoints = list()
         for point in self.target_points:
             pose_in_world = PoseStamped()
-            pose_in_world.header.frame_id = "ORB_SLAM/World"
+            pose_in_world.header.frame_id = "map"
             pose_in_world.header.stamp = rospy.Time(0)
             pose_in_world.pose.position = Point(point[0], point[1], point[2])
             q_angle = quaternion_from_euler(
                 0, 0, 0, axes='sxyz')
             pose_in_world.pose.orientation = Quaternion(*q_angle)
-
-            # 转至map坐标系
-            rospy.loginfo("获取ORB_SLAM/World->TF map")
-            tf_flag = False
-            while not tf_flag and not rospy.is_shutdown() and self.running_flag:
-                try:
-                    t = rospy.Time(0)
-                    self.listener.waitForTransform("ORB_SLAM/World", "map", t,
-                                                   rospy.Duration(1.0))
-                    tf_flag = True
-                except (tf.LookupException, tf.ConnectivityException,
-                        tf.ExtrapolationException, tf.Exception) as e:
-                    tf_flag = False
-                    rospy.logwarn("获取TF失败 ORB_SLAM/World->map")
-                    rospy.logwarn(e)
-            if not self.running_flag:
-                self.load_targets_exited_flag = True
-                return
-            rospy.loginfo("获取TF 成功 ORB_SLAM/World->map")
-            waypoint = self.listener.transformPose(
-                "map", pose_in_world)
-            self.waypoints.append(waypoint)
+            self.waypoints.append(pose_in_world)
         self.load_targets_exited_flag = True
         # 通过全局规划器，计算目标点的朝向
         rospy.loginfo("waiting for move_base/make_plan service")
@@ -159,8 +138,8 @@ class NavigationTask():
                 req.goal = waypoint
             req.tolerance = 0.1
             res = make_plan(req)
-            if len(res.plan.poses) > 10:
-                res.plan.poses = res.plan.poses[:-4]
+            # 截断，优化速度
+            res.plan.poses = res.plan.poses[10:]
             plan_path_2d = [[point.pose.position.x, point.pose.position.y]
                             for point in res.plan.poses]
             angle = self.get_target_direction(
@@ -291,7 +270,6 @@ class NavigationTask():
     # 插入点坐标为map坐标系下
     def insert_goal(self, pos_x, pos_y, pos_z):
         # 插入一个新点
-        # target_points在ORB_SLAM/World坐标系下
         q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
         q = Quaternion(*q_angle)
         waypoint = Pose(Point(pos_x, pos_y, pos_z), q)
@@ -300,26 +278,7 @@ class NavigationTask():
         waypoint_stamped.header.stamp = rospy.Time(0)
         waypoint_stamped.pose = waypoint
         self.waypoints.append(waypoint_stamped)
-
-        # 转至ORB_SLAM/World坐标系
-        rospy.loginfo("获取TF map->ORB_SLAM/World")
-        tf_flag = False
-        while not tf_flag and not rospy.is_shutdown():
-            try:
-                t = rospy.Time(0)
-                self.listener.waitForTransform("map", "ORB_SLAM/World", t,
-                                               rospy.Duration(1.0))
-                tf_flag = True
-            except (tf.LookupException, tf.ConnectivityException,
-                    tf.ExtrapolationException, tf.Exception) as e:
-                tf_flag = False
-                rospy.logwarn("获取TF失败 map->ORB_SLAM/World")
-                rospy.logwarn(e)
-        rospy.loginfo("获取TF 成功 map->ORB_SLAM/World")
-        target_point = self.listener.transformPose(
-            "ORB_SLAM/World", waypoint_stamped)
-        target_point.header.stamp = rospy.Time.now()
-        self.target_points.append(target_point)
+        self.target_points.append(waypoint_stamped)
         rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def reset_goals(self):
