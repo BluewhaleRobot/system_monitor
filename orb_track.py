@@ -144,7 +144,7 @@ def do_security():
 
     # 视觉丢失超时保险
     # 里程计丢失超时保险
-    if (CAMERA_UPDATE_FLAG and time2_diff.to_sec() > 180 and not BAR_FLAG) or time1_diff.to_sec() > 5.:
+    if (CAMERA_UPDATE_FLAG and time2_diff.to_sec() > 180 and not BAR_FLAG) or time1_diff.to_sec() > 60.:
         # 发布全局禁止flag
         global_move_flag = Bool()
         global_move_flag.data = False
@@ -158,10 +158,12 @@ def do_security():
     STATUS_LOCK.release()
 
 
-def deal_car_status(car_status):
+def deal_car_status(car_twsit_msg):
     global BAR_FLAG
-    status = car_status.data
-    if status == 2:
+    vx_temp = car_twist_msg.linear.x
+    theta_temp = car_twist_msg.angular.z
+
+    if abs(vx_temp) < 0.01 and abs(theta_temp) <0.01:
         BAR_FLAG = True
     else:
         BAR_FLAG = False
@@ -183,7 +185,7 @@ def init():
     rospy.Subscriber("/system_monitor/report", Status, system_status_handler)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, camera_odom)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, car_odom)
-    rospy.Subscriber("/xqserial_server/StatusFlag", Int32, deal_car_status)
+    rospy.Subscriber("/xqserial_server/Twist", Twist, deal_car_status)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
     NAV_FLAG_PUB = rospy.Publisher('/nav_setStop', Bool, queue_size=0)
     VEL_PUB = rospy.Publisher('/cmd_vel', Twist, queue_size=5)

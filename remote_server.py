@@ -100,7 +100,7 @@ if __name__ == "__main__":
     s = socket(AF_INET, SOCK_DGRAM)
     s.bind(('', 0))
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-    
+
     # 配置全局系统状态
     galileo_status = GalileoStatus()
     galileo_status_lock = threading.Lock()
@@ -141,18 +141,18 @@ if __name__ == "__main__":
                 sub_process_thread = None
             else:
                 cmd = None
-                if galileo_status.navStatus == 1 and not rplidar_flag:
+                if galileo_status.visualStatus != -1 and not rplidar_flag:
                     # 打开雷达电机
                     if rosservice.get_service_node("/start_motor") is not None:
                         cmd = "rosservice call /start_motor"
                         sub_process_thread = subprocess.Popen(
                             cmd, shell=True, env=new_env)
-                # elif rplidar_flag and galileo_status.navStatus == 0:
-                #     # 关闭雷达电机
-                #     if rosservice.get_service_node("/stop_motor") is not None:
-                #         cmd = "rosservice call /stop_motor"
-                #         sub_process_thread = subprocess.Popen(
-                #             cmd, shell=True, env=new_env)
+                elif rplidar_flag and galileo_status.visualStatus == -1:
+                    # 关闭雷达电机
+                    if rosservice.get_service_node("/stop_motor") is not None:
+                        cmd = "rosservice call /stop_motor"
+                        sub_process_thread = subprocess.Popen(
+                            cmd, shell=True, env=new_env)
         if heart_beat_count == 1:
             rplidar_flag = False
 
