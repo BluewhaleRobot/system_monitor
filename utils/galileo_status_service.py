@@ -193,7 +193,7 @@ class GalileoStatusService(threading.Thread):
                         self.galileo_status.currentPosX = -1
                         self.galileo_status.currentPosY = -1
                         self.galileo_status.currentAngle = -1
-                elif not self.monitor_server.map_thread.stopped():
+                elif not self.monitor_server.map_thread.stopped() and self.visual_status == 1:
                     # 处于建图状态
                     # 获取map到baselink坐标变换
                     latest = rospy.Time(0)
