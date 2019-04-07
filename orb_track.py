@@ -158,7 +158,7 @@ def do_security():
     STATUS_LOCK.release()
 
 
-def deal_car_status(car_twsit_msg):
+def deal_car_status(car_twist_msg):
     global BAR_FLAG
     vx_temp = car_twist_msg.linear.x
     theta_temp = car_twist_msg.angular.z
