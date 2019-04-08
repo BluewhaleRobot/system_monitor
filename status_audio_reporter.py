@@ -33,7 +33,7 @@ if __name__ == "__main__":
         else:
             BLOCK_TIME_COUNT = 0
         if BLOCK_TIME_COUNT >= 5000: # 等待三秒
-            BLOCK_TIME_COUNT = 0
+            BLOCK_TIME_COUNT = -10000 # 每15秒说一次
             audio_pub.publish("您好，请让一下。赤兔机器人努力工作中")
 
         PREVISOUS_STATUS = status
