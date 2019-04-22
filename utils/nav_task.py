@@ -140,7 +140,16 @@ class NavigationTask():
             else:
                 req.goal = waypoint
             req.tolerance = 0.1
-            res = make_plan(req)
+            try:
+                res = make_plan(req)
+            except Exception as e:
+                rospy.logerr(e)
+                time.sleep(2)
+                # 再次尝试调用
+                try:
+                    res = make_plan(req)
+                except Exception as ex:
+                    rospy.logerr(ex)
             # 截断，优化速度
             res.plan.poses = res.plan.poses[10:]
             plan_path_2d = [[point.pose.position.x, point.pose.position.y]
