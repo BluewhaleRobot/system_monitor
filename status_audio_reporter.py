@@ -22,6 +22,8 @@ if __name__ == "__main__":
             audio_pub.publish("开始充电")
         if PREVISOUS_STATUS.chargeStatus != 2 and status.chargeStatus == 2:
             audio_pub.publish("充电完成")
+        if PREVISOUS_STATUS.chargeStatus == 1 and status.chargeStatus == 0:
+            audio_pub.publish("停止充电")
         if PREVISOUS_STATUS.mapStatus != 1 and status.mapStatus == 1:
             audio_pub.publish("开始创建地图")
         if PREVISOUS_STATUS.navStatus != 1 and status.navStatus == 1:

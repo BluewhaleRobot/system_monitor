@@ -351,6 +351,8 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("i"):
                     pos_x = struct.unpack("f", bytearray(cmds[count][2:6]))[0]
                     pos_y = struct.unpack("f", bytearray(cmds[count][6:10]))[0]
+                    print("######################")
+                    print("inser goal")
                     if self.nav_task is not None:
                         rospy.logwarn("插入目标点: " +  str(pos_x) + " " + str(pos_y))
                         self.nav_task.insert_goal(pos_x, pos_y, 0)
