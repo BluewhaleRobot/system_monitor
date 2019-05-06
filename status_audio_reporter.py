@@ -29,12 +29,12 @@ if __name__ == "__main__":
         if PREVISOUS_STATUS.navStatus != 1 and status.navStatus == 1:
             audio_pub.publish("开始导航")
         # 被挡住提示
-        if status.targetStatus == 1 and status.currentSpeedX < 0.01 and status.currentSpeedTheta < 0.01:
+        if status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
             # 被人挡住了,在 WORKING 状态但是没有动
             BLOCK_TIME_COUNT += (1000 / 30)
         else:
             BLOCK_TIME_COUNT = 0
-        if BLOCK_TIME_COUNT >= 5000: # 等待三秒
+        if BLOCK_TIME_COUNT >= 5000: # 等待5秒
             BLOCK_TIME_COUNT = -10000 # 每15秒说一次
             audio_pub.publish("您好，请让一下。赤兔机器人努力工作中")
 
