@@ -45,6 +45,7 @@ from config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
 from scipy import optimize
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
+from actionlib_msgs.msg import GoalStatus
 
 
 class NavigationTask():
@@ -72,6 +73,9 @@ class NavigationTask():
         self.last_speed = None
         self.load_targets_exited_flag = True
         self.running_flag = True
+        self.goal_lock = threading.Lock()
+        self.original_target_points = None
+        self.original_waypoints = None
 
         def get_odom(odom):
             with self.status_lock:
@@ -97,62 +101,78 @@ class NavigationTask():
         self.start_load_targets()
 
     def load_targets_task(self):
-        if not os.path.exists(self.nav_points_file):
-            self.target_points = []
-            self.waypoints = list()
+        with self.goal_lock:
+            if not os.path.exists(self.nav_points_file):
+                self.target_points = []
+                self.waypoints = list()
 
-        with open(self.nav_points_file, "r") as nav_data_file:
-            nav_data_str = nav_data_file.readline()
-            self.target_points = []
-            while len(nav_data_str) != 0:
-                pos_x = float(nav_data_str.split(" ")[0])
-                pos_y = float(nav_data_str.split(" ")[1])
-                pos_z = float(nav_data_str.split(" ")[2])
-                self.target_points.append([pos_x, pos_y, pos_z])
+            with open(self.nav_points_file, "r") as nav_data_file:
                 nav_data_str = nav_data_file.readline()
+                self.target_points = []
+                while len(nav_data_str) != 0:
+                    pos_x = float(nav_data_str.split(" ")[0])
+                    pos_y = float(nav_data_str.split(" ")[1])
+                    pos_z = float(nav_data_str.split(" ")[2])
+                    self.target_points.append([pos_x, pos_y, pos_z])
+                    nav_data_str = nav_data_file.readline()
 
-        self.waypoints = list()
-        for point in self.target_points:
-            pose_in_world = PoseStamped()
-            pose_in_world.header.frame_id = "map"
-            pose_in_world.header.stamp = rospy.Time(0)
-            pose_in_world.pose.position = Point(point[0], point[1], point[2])
-            q_angle = quaternion_from_euler(
-                0, 0, 0, axes='sxyz')
-            pose_in_world.pose.orientation = Quaternion(*q_angle)
-            self.waypoints.append(pose_in_world)
-        self.load_targets_exited_flag = True
-        # 通过全局规划器，计算目标点的朝向
-        rospy.loginfo("waiting for move_base/make_plan service")
-        rospy.wait_for_service("/move_base/make_plan")
-        rospy.loginfo("waiting for move_base/make_plan service succeed")
-        make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
-        for waypoint in self.waypoints:
-            req = GetPlanRequest()
-            req.start = self.waypoints[0]
-            if waypoint == self.waypoints[0]:
-                rospy.loginfo("Set 0 point direction")
-                req.start = self.waypoints[1]
-                req.goal = self.waypoints[0]  # 修复0号点方向问题
-            else:
-                req.goal = waypoint
-            req.tolerance = 0.1
-            res = make_plan(req)
-            # 截断，优化速度
-            res.plan.poses = res.plan.poses[10:]
-            plan_path_2d = [[point.pose.position.x, point.pose.position.y]
-                            for point in res.plan.poses]
-            angle = self.get_target_direction(
-                [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
-            if waypoint == self.waypoints[0]:
-                # 0号点头朝向1号点
-                q_angle = quaternion_from_euler(0, 0, math.atan2(
-                    angle[1], angle[0]), axes='sxyz')
-            else:
-                q_angle = quaternion_from_euler(0, 0, math.atan2(
-                    angle[1], angle[0]) + math.pi, axes='sxyz')
-            waypoint.pose.orientation = Quaternion(*q_angle)
-        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+            self.waypoints = list()
+            for point in self.target_points:
+                pose_in_world = PoseStamped()
+                pose_in_world.header.frame_id = "map"
+                pose_in_world.header.stamp = rospy.Time(0)
+                pose_in_world.pose.position = Point(point[0], point[1], point[2])
+                q_angle = quaternion_from_euler(
+                    0, 0, 0, axes='sxyz')
+                pose_in_world.pose.orientation = Quaternion(*q_angle)
+                self.waypoints.append(pose_in_world)
+            self.load_targets_exited_flag = True
+            # 通过全局规划器，计算目标点的朝向
+            rospy.loginfo("waiting for move_base/make_plan service")
+            rospy.wait_for_service("/move_base/make_plan")
+            rospy.loginfo("waiting for move_base/make_plan service succeed")
+            make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
+            for waypoint in self.waypoints:
+                req = GetPlanRequest()
+                req.start = self.waypoints[0]
+                if waypoint == self.waypoints[0]:
+                    rospy.loginfo("Set 0 point direction")
+                    req.start = self.waypoints[1]
+                    req.goal = self.waypoints[0]  # 修复0号点方向问题
+                else:
+                    req.goal = waypoint
+                req.tolerance = 0.1
+                res = None
+                try:
+                    res = make_plan(req)
+                except Exception as e:
+                    rospy.logerr(e)
+                    time.sleep(2)
+                    # 再次尝试调用
+                    try:
+                        res = make_plan(req)
+                    except Exception as ex:
+                        rospy.logerr(ex)
+                if res == None:
+                    # 获取角度失败
+                    continue
+                # 截断，优化速度
+                res.plan.poses = res.plan.poses[10:]
+                plan_path_2d = [[point.pose.position.x, point.pose.position.y]
+                                for point in res.plan.poses]
+                angle = self.get_target_direction(
+                    [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
+                if waypoint == self.waypoints[0]:
+                    # 0号点头朝向1号点
+                    q_angle = quaternion_from_euler(0, 0, math.atan2(
+                        angle[1], angle[0]), axes='sxyz')
+                else:
+                    q_angle = quaternion_from_euler(0, 0, math.atan2(
+                        angle[1], angle[0]) + math.pi, axes='sxyz')
+                waypoint.pose.orientation = Quaternion(*q_angle)
+            self.original_target_points = list(self.target_points)
+            self.original_waypoints = list(self.waypoints)
+            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def start_load_targets(self):
         if self.load_targets_exited_flag:
@@ -268,24 +288,28 @@ class NavigationTask():
                          )
 
     # 插入点坐标为map坐标系下
-    def insert_goal(self, pos_x, pos_y, pos_z):
-        # 插入一个新点
-        q_angle = quaternion_from_euler(0, 0, 0, axes='sxyz')
-        q = Quaternion(*q_angle)
-        waypoint = Pose(Point(pos_x, pos_y, pos_z), q)
-        waypoint_stamped = PoseStamped()
-        waypoint_stamped.header.frame_id = "map"
-        waypoint_stamped.header.stamp = rospy.Time(0)
-        waypoint_stamped.pose = waypoint
-        self.waypoints.append(waypoint_stamped)
-        self.target_points.append(waypoint_stamped)
-        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+    def insert_goal(self, pos_x, pos_y, pos_z, angle=0):
+        with self.goal_lock:
+            # 插入一个新点
+            q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
+            q = Quaternion(*q_angle)
+            waypoint = Pose(Point(pos_x, pos_y, pos_z), q)
+            waypoint_stamped = PoseStamped()
+            waypoint_stamped.header.frame_id = "map"
+            waypoint_stamped.header.stamp = rospy.Time(0)
+            waypoint_stamped.pose = waypoint
+            self.waypoints.append(waypoint_stamped)
+            self.target_points.append(waypoint_stamped)
+            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def reset_goals(self):
-        self.current_goal_id = -1
-        self.goal_status = "FREE"
-        self.load_targets_task()
-        rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+        self.cancel_goal()
+        with self.goal_lock:
+            self.current_goal_id = -1
+            self.goal_status = "FREE"
+            self.target_points = list(self.original_target_points)
+            self.waypoints = list(self.original_waypoints)
+            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
 
     def loop_task(self):
         # 获取当前最近的位置
@@ -431,3 +455,19 @@ class NavigationTask():
         filtered_nodes = filter(
             lambda point: point[0] != node[0] or point[1] != node[1], nodes)
         return filtered_nodes[cdist([node], filtered_nodes).argmin()]
+
+    def set_angle(self, angle):
+        goal = MoveBaseGoal()
+        target_pose = PoseStamped()
+        target_pose.pose.position = self.current_pose_stamped_map.pose.position
+        q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
+        target_pose.pose.orientation = Quaternion(*q_angle)
+        goal.target_pose = target_pose
+        def done_cb(status, result):
+            self.goal_status = "FREE"
+        # wait for 1s
+        if not self.move_base.wait_for_server(rospy.Duration(1)):
+            self.goal_status = "ERROR"
+            return
+        self.move_base.send_goal(goal, done_cb=done_cb)
+        
