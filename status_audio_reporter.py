@@ -5,16 +5,20 @@ import rospy
 from std_msgs.msg import String
 from galileo_serial_server.msg import GalileoStatus
 import time
+import rosservice
+import subprocess
+import os
 
 PREVISOUS_STATUS = None
 BLOCK_TIME_COUNT = 0
+STOP_TIME_COUNT = 0
 
 if __name__ == "__main__":
     rospy.init_node("status_audio_reporter")
     audio_pub = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=10)
 
     def status_update_cb(status):
-        global PREVISOUS_STATUS, BLOCK_TIME_COUNT
+        global PREVISOUS_STATUS, BLOCK_TIME_COUNT, STOP_TIME_COUNT
         if PREVISOUS_STATUS == None:
             PREVISOUS_STATUS = status
             return
@@ -37,6 +41,26 @@ if __name__ == "__main__":
         if BLOCK_TIME_COUNT >= 5000: # 等待5秒
             BLOCK_TIME_COUNT = -10000 # 每15秒说一次
             audio_pub.publish("您好，请让一下。赤兔机器人努力工作中")
+        # 5min不动则关闭雷达
+        if abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            STOP_TIME_COUNT += (1000 / 30)
+        else:
+            STOP_TIME_COUNT = 0
+        new_env = os.environ.copy()
+        if STOP_TIME_COUNT >= 5 * 60 * 1000:
+            if rospy.get_param("/rplidar_node_manager/keep_running", True):
+                rospy.set_param("/rplidar_node_manager/keep_running", False)
+                if rosservice.get_service_node("/stop_motor") is not None:
+                    cmd = "rosservice call /stop_motor"
+                    subprocess.Popen(
+                        cmd, shell=True, env=new_env)
+        else:
+            if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+                rospy.set_param("/rplidar_node_manager/keep_running", True)
+                if rosservice.get_service_node("/start_motor") is not None:
+                    cmd = "rosservice call /start_motor"
+                    subprocess.Popen(
+                        cmd, shell=True, env=new_env)
 
         PREVISOUS_STATUS = status
 
