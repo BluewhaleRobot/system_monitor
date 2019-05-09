@@ -159,9 +159,12 @@ class NavigationTask():
                     # 获取角度失败
                     continue
                 # 截断，优化速度
-                res.plan.poses = res.plan.poses[10:]
+                res.plan.poses = res.plan.poses[-10:]
                 plan_path_2d = [[point.pose.position.x, point.pose.position.y]
                                 for point in res.plan.poses]
+                if len(plan_path_2d) < 4:
+                    rospy.logwarn("Not enough point to calculate direction")
+                    continue
                 angle = self.get_target_direction(
                     [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
                 if waypoint == self.waypoints[0]:
