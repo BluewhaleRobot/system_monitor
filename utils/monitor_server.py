@@ -346,6 +346,14 @@ class MonitorServer(threading.Thread):
                         save_msg = Bool()
                         save_msg.data = True
                         self.charge_pose_pub.publish(save_msg)
+                elif cmds[count][0] == ord('H'):
+                    if cmds[count][1] == 0:
+                        # start greetings
+                        rospy.set_param("/xiaoqiang_greeting_node/is_enabled", True)
+                    if cmds[count][1] == 1:
+                        # stop greetings
+                        rospy.set_param("/xiaoqiang_greeting_node/is_enabled", False)
+
             if len(cmds[count]) > 2:
                 # insert new goal
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("i"):
