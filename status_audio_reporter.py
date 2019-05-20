@@ -32,6 +32,9 @@ if __name__ == "__main__":
             audio_pub.publish("开始创建地图")
         if PREVISOUS_STATUS.navStatus != 1 and status.navStatus == 1:
             audio_pub.publish("开始导航")
+        if status.navStatus == 1 and PREVISOUS_STATUS.targetNumID != 0 and status.targetNumID == 0:
+            # 返回厨房提示
+            audio_pub.publish("好的，我回去了，您慢用！")
         # 被挡住提示
         if status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
             # 被人挡住了,在 WORKING 状态但是没有动
@@ -40,7 +43,7 @@ if __name__ == "__main__":
             BLOCK_TIME_COUNT = 0
         if BLOCK_TIME_COUNT >= 5000: # 等待5秒
             BLOCK_TIME_COUNT = -10000 # 每15秒说一次
-            audio_pub.publish("您好，请让一下。赤兔机器人努力工作中")
+            audio_pub.publish("请让开一下，谢谢！")
         # 5min不动则关闭雷达
         if abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
             STOP_TIME_COUNT += (1000 / 30)
