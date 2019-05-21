@@ -12,15 +12,18 @@ import os
 PREVISOUS_STATUS = None
 BLOCK_TIME_COUNT = 0
 STOP_TIME_COUNT = 0
+PREVIOUS_GREETING_FLAG = False
 
 if __name__ == "__main__":
     rospy.init_node("status_audio_reporter")
     audio_pub = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=10)
 
     def status_update_cb(status):
-        global PREVISOUS_STATUS, BLOCK_TIME_COUNT, STOP_TIME_COUNT
+        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT
         if PREVISOUS_STATUS == None:
             PREVISOUS_STATUS = status
+            PREVIOUS_GREETING_FLAG = rospy.get_param(
+                "/xiaoqiang_greeting_node/is_enabled", False)
             return
         if PREVISOUS_STATUS.chargeStatus != 1 and status.chargeStatus == 1:
             audio_pub.publish("开始充电")
@@ -32,6 +35,10 @@ if __name__ == "__main__":
             audio_pub.publish("开始创建地图")
         if PREVISOUS_STATUS.navStatus != 1 and status.navStatus == 1:
             audio_pub.publish("开始导航")
+        if not PREVIOUS_GREETING_FLAG and rospy.get_param("/xiaoqiang_greeting_node/is_enabled", False):
+            audio_pub.publish("开启迎宾模式")
+        if PREVIOUS_GREETING_FLAG and not rospy.get_param("/xiaoqiang_greeting_node/is_enabled", False):
+            audio_pub.publish("关闭迎宾模式")
         if status.navStatus == 1 and PREVISOUS_STATUS.targetNumID != 0 and status.targetNumID == 0:
             # 返回厨房提示
             audio_pub.publish("好的，我回去了，您慢用！")
@@ -64,7 +71,8 @@ if __name__ == "__main__":
                     cmd = "rosservice call /start_motor"
                     subprocess.Popen(
                         cmd, shell=True, env=new_env)
-
+        PREVIOUS_GREETING_FLAG = rospy.get_param(
+            "/xiaoqiang_greeting_node/is_enabled", False)
         PREVISOUS_STATUS = status
 
     status_sub = rospy.Subscriber("/galileo/status", GalileoStatus, status_update_cb)
