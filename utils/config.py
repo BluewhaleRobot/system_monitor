@@ -33,8 +33,8 @@ USERSOCKET_PORT = 20001  # 局域网udp命令监听端口
 BROADCAST_PORT = 22001 # 局域网广播端口
 BROADCAST_PORT_V2 = 22002 # 局域网广播端口V2版本
 
-MAX_VEL = 0.8
-MAX_THETA = 2.0
+MAX_VEL = 0.5
+MAX_THETA = 1.2
 POWER_LOW = 22.0
 
 TF_ROT = np.array([[0., 0., 1.],
