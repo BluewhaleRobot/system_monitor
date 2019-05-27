@@ -132,6 +132,7 @@ class NavigationTask():
             # 通过全局规划器，计算目标点的朝向
             rospy.loginfo("waiting for move_base/make_plan service")
             rospy.wait_for_service("/move_base/make_plan")
+            time.sleep(3)
             rospy.loginfo("waiting for move_base/make_plan service succeed")
             make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
             for waypoint in self.waypoints:
@@ -483,4 +484,3 @@ class NavigationTask():
             self.goal_status = "ERROR"
             return
         self.move_base.send_goal(goal, done_cb=done_cb)
-        
