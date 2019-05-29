@@ -148,7 +148,6 @@ class NavigationTask():
                 req.tolerance = 0.1
                 res = None
                 try:
-                    raise ValueError("just test")
                     res = make_plan(req)
                     # 截断，优化速度
                     res.plan.poses = res.plan.poses[-10:]
