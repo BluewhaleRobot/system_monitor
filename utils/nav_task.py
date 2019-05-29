@@ -29,6 +29,7 @@ import math
 import threading
 import time
 import os
+import json
 
 import actionlib
 import numpy as np
@@ -123,7 +124,8 @@ class NavigationTask():
                 pose_in_world = PoseStamped()
                 pose_in_world.header.frame_id = "map"
                 pose_in_world.header.stamp = rospy.Time(0)
-                pose_in_world.pose.position = Point(point[0], point[1], point[2])
+                pose_in_world.pose.position = Point(
+                    point[0], point[1], point[2])
                 q_angle = quaternion_from_euler(
                     0, 0, 0, axes='sxyz')
                 pose_in_world.pose.orientation = Quaternion(*q_angle)
@@ -147,37 +149,36 @@ class NavigationTask():
                 res = None
                 try:
                     res = make_plan(req)
+                    # 截断，优化速度
+                    res.plan.poses = res.plan.poses[-10:]
+                    plan_path_2d = [[point.pose.position.x, point.pose.position.y]
+                                    for point in res.plan.poses]
+                    if len(plan_path_2d) < 4:
+                        rospy.logwarn(
+                            "Not enough point to calculate direction")
+                        raise ValueError("Not enough point to calculate direction")
+                    angle = self.get_target_direction(
+                        [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
+                    if waypoint == self.waypoints[0]:
+                        # 0号点头朝向1号点
+                        q_angle = quaternion_from_euler(0, 0, math.atan2(
+                            angle[1], angle[0]), axes='sxyz')
+                    else:
+                        q_angle = quaternion_from_euler(0, 0, math.atan2(
+                            angle[1], angle[0]) + math.pi, axes='sxyz')
+                    self.update_angle_record(
+                        self.waypoints.index(waypoint), q_angle)
                 except Exception as e:
                     rospy.logerr(e)
-                    time.sleep(2)
-                    # 再次尝试调用
-                    try:
-                        res = make_plan(req)
-                    except Exception as ex:
-                        rospy.logerr(ex)
-                if res == None:
-                    # 获取角度失败
-                    continue
-                # 截断，优化速度
-                res.plan.poses = res.plan.poses[-10:]
-                plan_path_2d = [[point.pose.position.x, point.pose.position.y]
-                                for point in res.plan.poses]
-                if len(plan_path_2d) < 4:
-                    rospy.logwarn("Not enough point to calculate direction")
-                    continue
-                angle = self.get_target_direction(
-                    [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
-                if waypoint == self.waypoints[0]:
-                    # 0号点头朝向1号点
-                    q_angle = quaternion_from_euler(0, 0, math.atan2(
-                        angle[1], angle[0]), axes='sxyz')
-                else:
-                    q_angle = quaternion_from_euler(0, 0, math.atan2(
-                        angle[1], angle[0]) + math.pi, axes='sxyz')
-                waypoint.pose.orientation = Quaternion(*q_angle)
+                if res is None:
+                    q_angle = self.get_angle_record(
+                        self.waypoints.index(waypoint))
+                if q_angle is not None:
+                    waypoint.pose.orientation = Quaternion(*q_angle)
             self.original_target_points = list(self.target_points)
             self.original_waypoints = list(self.waypoints)
-            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+            rosparam.set_param("/galileo/goal_num",
+                               str(len(self.target_points)))
 
     def start_load_targets(self):
         if self.load_targets_exited_flag:
@@ -267,7 +268,7 @@ class NavigationTask():
         # get current robot position
         if self.current_goal_id == -1:
             return -1
-        if self.current_pose_stamped == None:
+        if self.current_pose_stamped is None:
             return -1
 
         latest = rospy.Time(0)
@@ -313,7 +314,8 @@ class NavigationTask():
             waypoint_stamped.pose = waypoint
             self.waypoints.append(waypoint_stamped)
             self.target_points.append(waypoint_stamped)
-            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+            rosparam.set_param("/galileo/goal_num",
+                               str(len(self.target_points)))
 
     def reset_goals(self):
         self.cancel_goal()
@@ -322,7 +324,8 @@ class NavigationTask():
             self.goal_status = "FREE"
             self.target_points = list(self.original_target_points)
             self.waypoints = list(self.original_waypoints)
-            rosparam.set_param("/galileo/goal_num", str(len(self.target_points)))
+            rosparam.set_param("/galileo/goal_num",
+                               str(len(self.target_points)))
 
     def loop_task(self):
         # 获取当前最近的位置
@@ -476,6 +479,7 @@ class NavigationTask():
         q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
         target_pose.pose.orientation = Quaternion(*q_angle)
         goal.target_pose = target_pose
+
         def done_cb(status, result):
             self.goal_status = "FREE"
         # wait for 1s
@@ -483,3 +487,37 @@ class NavigationTask():
             self.goal_status = "ERROR"
             return
         self.move_base.send_goal(goal, done_cb=done_cb)
+
+    def update_angle_record(self, index, angle):
+        angle_records_path = "/" + os.path.join(
+            *self.nav_points_file.split("/")[:-1]) + "/angle.json"
+        if not os.path.exists(angle_records_path):
+            with open(angle_records_path, "w") as angle_records_file:
+                angle_records_file.write(json.dumps({}))
+        angle_records_file = open(angle_records_path, "r+")
+        try:
+            self.angle_records = json.loads(angle_records_file.read())
+        except Exception as e:
+            rospy.logerr(e)
+            self.angle_records = {}
+        self.angle_records[str(index)] = angle.tolist()
+        angle_records_file.close()
+        angle_records_file = open(angle_records_path, "w")
+        angle_records_file.write(json.dumps(self.angle_records, indent=4))
+        angle_records_file.close()
+
+    def get_angle_record(self, index):
+        angle_records_path = "/" + os.path.join(
+            *self.nav_points_file.split("/")[:-1]) + "/angle.json"
+        if not os.path.exists(angle_records_path):
+            with open(angle_records_path, "w") as angle_records_file:
+                angle_records_file.write(json.dumps({}))
+        with open(angle_records_path, "r") as angle_records_file:
+            try:
+                self.angle_records = json.loads(angle_records_file.read())
+            except Exception as e:
+                rospy.logerr(e)
+            if str(index) in self.angle_records:
+                return np.array(self.angle_records[str(index)])
+            else:
+                return None
