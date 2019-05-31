@@ -162,10 +162,10 @@ class NavigationTask():
                     if waypoint == self.waypoints[0]:
                         # 0号点头朝向1号点
                         q_angle = quaternion_from_euler(0, 0, math.atan2(
-                            angle[1], angle[0]), axes='sxyz')
+                            angle[1], angle[0]) + math.pi, axes='sxyz')
                     else:
                         q_angle = quaternion_from_euler(0, 0, math.atan2(
-                            angle[1], angle[0]) + math.pi, axes='sxyz')
+                            angle[1], angle[0]), axes='sxyz')
                     self.update_angle_record(
                         self.waypoints.index(waypoint), q_angle)
                 except Exception as e:
@@ -457,15 +457,31 @@ class NavigationTask():
             lambda point: point[0] != nearest_point_2[0] or point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
         nearest_point_3 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
+        
+        delta_x = nearest_point[0] - nearest_point_3[0]
+        delta_y = nearest_point[1] - nearest_point_3[1]
+
+        if delta_x == 0 and delta_y > 0:
+            return (0, 1)
+        if delta_x == 0 and delta_y < 0:
+            return (0, -1)
+        if delta_x > 0 and delta_y == 0:
+            return (1, 0)
+        if delta_x < 0 and delta_y == 0:
+            return (-1, 0)
 
         def f_1(x, A, B):
             return A*x + B
         A1, _ = optimize.curve_fit(f_1, [nearest_point[0], nearest_point_2[0], nearest_point_3[0]],
                                    [nearest_point[1], nearest_point_2[1], nearest_point_3[1]])[0]
-        if (nearest_point_3[0] - nearest_point[0]) * A1 >= 0:
-            return (1 / A1, 1)
-        else:
-            return (-1 / A1, -1)
+        if delta_x > 0 and delta_y > 0:
+            return (1 / abs(A1), 1)
+        elif delta_x > 0 and delta_y < 0:
+            return (1 / abs(A1), -1)
+        elif delta_x < 0 and delta_y > 0:
+            return (-1 / abs(A1), 1)
+        elif delta_x < 0 and delta_y < 0:
+            return (-1 / abs(A1), -1)
 
     def closest_node(self, node, nodes):
         filtered_nodes = filter(
