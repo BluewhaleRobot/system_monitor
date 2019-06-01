@@ -63,6 +63,9 @@ ENABLE_MOVE_FLAG = True
 
 WORKING_FLAG = False
 
+time2_diff_value = 0.0
+
+ORB_INIT_FLAG2 = False
 class TrackTask(threading.Thread):
 
     def __init__(self):
@@ -122,69 +125,82 @@ def car_odom(odom):
 
 
 def camera_odom(campose):
-    global CAMERA_CURRENT_TIME, STATUS_LOCK, CAMERA_UPDATE_FLAG
+    global CAMERA_CURRENT_TIME, STATUS_LOCK, CAMERA_UPDATE_FLAG,ORB_INIT_FLAG2
     with STATUS_LOCK:
         CAMERA_CURRENT_TIME = rospy.Time.now()
         CAMERA_UPDATE_FLAG = True
-
+        ORB_INIT_FLAG2 = True
 
 def do_security():
     global STATUS_LOCK, CAR_UPDATE_FLAG, CAMERA_UPDATE_FLAG
     global CAMERA_CURRENT_TIME, CAR_CURRENT_TIME
     global GLOBAL_MOVE_PUB, VEL_PUB
     global NAV_FLAG_PUB, ENABLE_MOVE_FLAG, BAR_FLAG
+    global time2_diff_value,ORB_INIT_FLAG2
 
     time_now = rospy.Time.now()
 
     STATUS_LOCK.acquire()
 
-    if CAR_UPDATE_FLAG:
+    time1_diff = time_now - time_now
+
+    if not CAR_UPDATE_FLAG :
         time1_diff = time_now - CAR_CURRENT_TIME
 
-    if CAMERA_UPDATE_FLAG:
+    if not CAMERA_UPDATE_FLAG:
         time2_diff = time_now - CAMERA_CURRENT_TIME
 
+        if time2_diff.to_sec()>1.0 :
+            time2_diff_value = time2_diff_value + time2_diff.to_sec()
+            CAMERA_CURRENT_TIME = time_now
+    else:
+        time2_diff_value = 0.0
+
+    CAMERA_UPDATE_FLAG = False
+    CAR_UPDATE_FLAG = False
     # 视觉丢失超时保险
     # 里程计丢失超时保险
-    if (CAMERA_UPDATE_FLAG and time2_diff.to_sec() > 120 and not BAR_FLAG and WORKING_FLAG) or time1_diff.to_sec() > 10.:
+    if ORB_INIT_FLAG2 and ( time2_diff_value > 120 or time1_diff.to_sec() > 120.) and not BAR_FLAG and WORKING_FLAG:
         # 发布全局禁止flag
         global_move_flag = Bool()
         global_move_flag.data = False
         GLOBAL_MOVE_PUB.publish(global_move_flag)
         car_twist = Twist()
         VEL_PUB.publish(car_twist)
-        CAMERA_UPDATE_FLAG = False
-        CAR_UPDATE_FLAG = False
+        ORB_INIT_FLAG2 = False
+        time2_diff_value = 0.0
         CAMERA_CURRENT_TIME = rospy.Time.now()
         CAR_CURRENT_TIME = rospy.Time.now()
-        rospy.logwarn("oups1 %d %d %f %f",BAR_FLAG,WORKING_FLAG,time2_diff.to_sec(),time1_diff.to_sec())
+        rospy.logwarn("oups3 %d %d %f %f",BAR_FLAG,WORKING_FLAG,time2_diff.to_sec(),time1_diff.to_sec())
     STATUS_LOCK.release()
 
 
 def deal_car_status(car_status):
-    global BAR_FLAG, STATUS_LOCK
+    global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
     with STATUS_LOCK:
         status = car_status.data
         if status == 2:
             BAR_FLAG = True
+            CAMERA_CURRENT_TIME = rospy.Time.now()
         else:
             BAR_FLAG = False
 
 def deal_car_status(car_twist_msg):
-    global BAR_FLAG, STATUS_LOCK
+    global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
     with STATUS_LOCK:
         vx_temp = car_twist_msg.linear.x
         theta_temp = car_twist_msg.angular.z
 
         if abs(vx_temp) < 0.05 and abs(theta_temp) <0.05:
             BAR_FLAG = True
+            CAMERA_CURRENT_TIME = rospy.Time.now()
         else:
             BAR_FLAG = False
             #rospy.logwarn("robot stopped")
 
 
 def deal_galileo_status(galileo_msg):
-    global WORKING_FLAG, STATUS_LOCK,CAR_CURRENT_TIME,CAMERA_CURRENT_TIME,CAR_UPDATE_FLAG,CAMERA_UPDATE_FLAG
+    global WORKING_FLAG, STATUS_LOCK,CAR_CURRENT_TIME,CAMERA_CURRENT_TIME
     with STATUS_LOCK:
 
         if galileo_msg.targetStatus == 1:
