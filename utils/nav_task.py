@@ -284,6 +284,8 @@ class NavigationTask():
         return self.pose_distance(mgoal, self.current_pose_stamped_map.pose)
 
     def update_pose(self):
+        if self.current_pose_stamped == None:
+            return -1
         latest = rospy.Time(0)
         self.current_pose_stamped.header.stamp = latest
         try:
