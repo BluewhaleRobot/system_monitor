@@ -284,6 +284,8 @@ class NavigationTask():
         return self.pose_distance(mgoal, self.current_pose_stamped_map.pose)
 
     def update_pose(self):
+        if self.current_pose_stamped == None:
+            return -1
         latest = rospy.Time(0)
         self.current_pose_stamped.header.stamp = latest
         try:
@@ -457,7 +459,7 @@ class NavigationTask():
             lambda point: point[0] != nearest_point_2[0] or point[1] != nearest_point_2[1], nav_path_points_2d_filterd)
         nearest_point_3 = self.closest_node(
             nearest_point, nav_path_points_2d_filterd)
-        
+
         delta_x = nearest_point[0] - nearest_point_3[0]
         delta_y = nearest_point[1] - nearest_point_3[1]
 
