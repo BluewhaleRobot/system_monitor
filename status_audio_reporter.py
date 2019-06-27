@@ -49,7 +49,7 @@ if __name__ == "__main__":
             BLOCK_TIME_COUNT += (1000 / 30)
         else:
             BLOCK_TIME_COUNT = 0
-        if BLOCK_TIME_COUNT >= 3000: # 等待3秒
+        if BLOCK_TIME_COUNT >= 1000: # 等待3秒
             BLOCK_TIME_COUNT = -16000 # 每19秒说一次
             audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
         # 5min不动则关闭雷达
