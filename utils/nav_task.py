@@ -51,8 +51,9 @@ from actionlib_msgs.msg import GoalStatus
 
 class NavigationTask():
 
-    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv", nav_path_file="/home/xiaoqiang/slamdb/path.csv"):
+    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv", nav_path_file="/home/xiaoqiang/slamdb/path.csv", new_nav_points_file="/home/xiaoqiang/slamdb/new_nav.csv"):
         self.nav_points_file = nav_points_file
+        self.new_nav_points_file = new_nav_points_file
         self.tf_rot = TF_ROT
         self.tf_trans = TF_TRANS
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
@@ -105,80 +106,115 @@ class NavigationTask():
 
     def load_targets_task(self):
         with self.goal_lock:
-            if not os.path.exists(self.nav_points_file):
+            use_new_nav_ = False
+            if not os.path.exists(self.nav_points_file) and not os.path.exists(self.new_nav_points_file):
                 self.target_points = []
                 self.waypoints = list()
+                return
+            if os.path.exists(self.new_nav_points_file):
+                use_new_nav_ = True
 
-            with open(self.nav_points_file, "r") as nav_data_file:
-                nav_data_str = nav_data_file.readline()
-                self.target_points = []
-                while len(nav_data_str) != 0:
-                    pos_x = float(nav_data_str.split(" ")[0])
-                    pos_y = float(nav_data_str.split(" ")[1])
-                    pos_z = float(nav_data_str.split(" ")[2])
-                    self.target_points.append([pos_x, pos_y, pos_z])
+            if not use_new_nav_:
+                with open(self.nav_points_file, "r") as nav_data_file:
                     nav_data_str = nav_data_file.readline()
+                    self.target_points = []
+                    while len(nav_data_str) != 0:
+                        pos_x = float(nav_data_str.split(" ")[0])
+                        pos_y = float(nav_data_str.split(" ")[1])
+                        pos_z = float(nav_data_str.split(" ")[2])
+                        self.target_points.append([pos_x, pos_y, pos_z])
+                        nav_data_str = nav_data_file.readline()
 
-            self.waypoints = list()
-            for point in self.target_points:
-                pose_in_world = PoseStamped()
-                pose_in_world.header.frame_id = "map"
-                pose_in_world.header.stamp = rospy.Time(0)
-                pose_in_world.pose.position = Point(
-                    point[0], point[1], point[2])
-                q_angle = quaternion_from_euler(
-                    0, 0, 0, axes='sxyz')
-                pose_in_world.pose.orientation = Quaternion(*q_angle)
-                self.waypoints.append(pose_in_world)
-            self.load_targets_exited_flag = True
-            # 通过全局规划器，计算目标点的朝向
-            rospy.loginfo("waiting for move_base/make_plan service")
-            rospy.wait_for_service("/move_base/make_plan")
-            rospy.loginfo("waiting for move_base/make_plan service succeed")
-            make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
-            for waypoint in self.waypoints:
-                req = GetPlanRequest()
-                req.start = self.waypoints[0]
-                if waypoint == self.waypoints[0]:
-                    rospy.loginfo("Set 0 point direction")
-                    req.start = self.waypoints[1]
-                    req.goal = self.waypoints[0]  # 修复0号点方向问题
-                else:
-                    req.goal = waypoint
-                req.tolerance = 0.1
-                res = None
-                try:
-                    res = make_plan(req)
-                    # 截断，优化速度
-                    res.plan.poses = res.plan.poses[-10:]
-                    plan_path_2d = [[point.pose.position.x, point.pose.position.y]
-                                    for point in res.plan.poses]
-                    if len(plan_path_2d) < 4:
-                        rospy.logwarn(
-                            "Not enough point to calculate direction")
-                        raise ValueError("Not enough point to calculate direction")
-                    angle = self.get_target_direction(
-                        [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
+                self.waypoints = list()
+                for point in self.target_points:
+                    pose_in_world = PoseStamped()
+                    pose_in_world.header.frame_id = "map"
+                    pose_in_world.header.stamp = rospy.Time(0)
+                    pose_in_world.pose.position = Point(
+                        point[0], point[1], point[2])
+                    q_angle = quaternion_from_euler(
+                        0, 0, 0, axes='sxyz')
+                    pose_in_world.pose.orientation = Quaternion(*q_angle)
+                    self.waypoints.append(pose_in_world)
+
+                # 通过全局规划器，计算目标点的朝向
+                rospy.loginfo("waiting for move_base/make_plan service")
+                rospy.wait_for_service("/move_base/make_plan")
+                rospy.loginfo("waiting for move_base/make_plan service succeed")
+                make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
+                for waypoint in self.waypoints:
+                    req = GetPlanRequest()
+                    req.start = self.waypoints[0]
                     if waypoint == self.waypoints[0]:
-                        # 0号点头朝向1号点
-                        q_angle = quaternion_from_euler(0, 0, math.atan2(
-                            angle[1], angle[0]) + math.pi, axes='sxyz')
+                        rospy.loginfo("Set 0 point direction")
+                        req.start = self.waypoints[1]
+                        req.goal = self.waypoints[0]  # 修复0号点方向问题
                     else:
-                        q_angle = quaternion_from_euler(0, 0, math.atan2(
-                            angle[1], angle[0]), axes='sxyz')
-                    self.update_angle_record(
-                        self.waypoints.index(waypoint), q_angle)
-                except Exception as e:
-                    rospy.logerr(e)
-                if res is None:
-                    q_angle = self.get_angle_record(
-                        self.waypoints.index(waypoint))
-                if q_angle is not None:
-                    waypoint.pose.orientation = Quaternion(*q_angle)
+                        req.goal = waypoint
+                    req.tolerance = 0.1
+                    res = None
+                    try:
+                        res = make_plan(req)
+                        # 截断，优化速度
+                        res.plan.poses = res.plan.poses[-10:]
+                        plan_path_2d = [[point.pose.position.x, point.pose.position.y]
+                                        for point in res.plan.poses]
+                        if len(plan_path_2d) < 4:
+                            rospy.logwarn(
+                                "Not enough point to calculate direction")
+                            raise ValueError("Not enough point to calculate direction")
+                        angle = self.get_target_direction(
+                            [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
+                        if waypoint == self.waypoints[0]:
+                            # 0号点头朝向1号点
+                            q_angle = quaternion_from_euler(0, 0, math.atan2(
+                                angle[1], angle[0]) + math.pi, axes='sxyz')
+                        else:
+                            q_angle = quaternion_from_euler(0, 0, math.atan2(
+                                angle[1], angle[0]), axes='sxyz')
+                        self.update_angle_record(
+                            self.waypoints.index(waypoint), q_angle)
+                    except Exception as e:
+                        rospy.logerr(e)
+                    if res is None:
+                        q_angle = self.get_angle_record(
+                            self.waypoints.index(waypoint))
+                    if q_angle is not None:
+                        waypoint.pose.orientation = Quaternion(*q_angle)
+            else:
+                angles = []
+                with open(self.new_nav_points_file, "r") as new_nav_data_file:
+                    new_nav_data_str = new_nav_data_file.readline()
+                    self.target_points = []
+                    while len(new_nav_data_str) != 0:
+                        pos_x = float(new_nav_data_str.split(" ")[0])
+                        pos_y = float(new_nav_data_str.split(" ")[1])
+                        pos_z = float(new_nav_data_str.split(" ")[2])
+                        angle = float(new_nav_data_str.split(" ")[3])
+                        angles.append(angle)
+                        self.target_points.append([pos_x, pos_y, pos_z])
+                        new_nav_data_str = new_nav_data_file.readline()
+
+                self.waypoints = list()
+                nav_index = 0
+                for point in self.target_points:
+                    pose_in_world = PoseStamped()
+                    pose_in_world.header.frame_id = "map"
+                    pose_in_world.header.stamp = rospy.Time(0)
+                    pose_in_world.pose.position = Point(
+                        point[0], point[1], point[2])
+                    q_angle = quaternion_from_euler(
+                        0, 0, angles[nav_index], axes='sxyz')
+                    pose_in_world.pose.orientation = Quaternion(*q_angle)
+                    self.waypoints.append(pose_in_world)
+                    self.update_angle_record(nav_index, q_angle)
+                    nav_index = nav_index + 1
+
             self.original_target_points = list(self.target_points)
             self.original_waypoints = list(self.waypoints)
             rosparam.set_param("/galileo/goal_num",
                                str(len(self.target_points)))
+            self.load_targets_exited_flag = True
 
     def start_load_targets(self):
         if self.load_targets_exited_flag:
@@ -484,6 +520,7 @@ class NavigationTask():
             return (-1 / abs(A1), 1)
         elif delta_x < 0 and delta_y < 0:
             return (-1 / abs(A1), -1)
+
 
     def closest_node(self, node, nodes):
         filtered_nodes = filter(

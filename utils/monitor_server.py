@@ -334,7 +334,6 @@ class MonitorServer(threading.Thread):
                             charge_msg = Bool()
                             charge_msg.data = True
                             self.charge_pub.publish(charge_msg)
-
                     if cmds[count][1] == 1:
                         # stop charge
                         charge_msg = Bool()
