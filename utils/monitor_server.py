@@ -71,6 +71,7 @@ class MonitorServer(threading.Thread):
         self.tilt_pub = pubs["TILT_PUB"]
         self.charge_pub = pubs["CHARGE_PUB"]
         self.charge_pose_pub = pubs["CHARGE_POSE_PUB"]
+        self.audio_pub = pubs["AUDIO_PUB"]
 
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
@@ -145,6 +146,9 @@ class MonitorServer(threading.Thread):
                 # 判断是否为关机命令
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     rospy.loginfo("system poweroff")
+                    self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
+                    time.sleep(6)
+                    rospy.loginfo("system poweroff2")
                     commands.getstatusoutput(
                         'sudo shutdown -h now')
 
@@ -367,7 +371,7 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("r"):
                     if self.nav_task is not None:
                         self.nav_task.reset_goals()
-                
+
                 # set loop and sleep time
                 if cmds[count][0] == ord("m") and cmds[count][1] == 5:
                     if self.nav_thread.stopped():
