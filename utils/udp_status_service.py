@@ -48,12 +48,12 @@ class UDPStatusService(threading.Thread):
         self._stop.set()
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
         self.send_data = bytearray(
-            [205, 235, 215, 40, 0x00, 0x00, 0x00, 0x00,
+            [205, 235, 215, 44, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-             0x00, 0x00, 0x00, 0x00,
+             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
              ])
         self.send_data2 = bytearray(
             [205, 235, 215, 32, 0x00, 0x00, 0x00, 0x00,
@@ -123,6 +123,8 @@ class UDPStatusService(threading.Thread):
                     'i', self.galileo_status.loopStatus))
                 self.send_data[36:40] = map(ord, struct.pack(
                     'i', self.galileo_status.chargeStatus))
+                self.send_data[44:48] = map(
+                    ord, struct.pack('f', self.galileo_status.targetDistance))
 
                 if self.galileo_status.navStatus == 1:
                     statu0 = 0x01  # 导航状态
@@ -153,7 +155,7 @@ class UDPStatusService(threading.Thread):
             self.send_data[3] = len(self.send_data) - 4
             self.monitor_server.sendto(bytes(self.send_data))
 
-            if self.envSensor_flag and  num_i >= 30:
+            if self.envSensor_flag and  num_i >= 3:
                 num_i = 0
                 self.send_data2[4:8] = map(ord, struct.pack('f', self.env_sensor_data.temperature))
                 self.send_data2[8:12] = map(ord, struct.pack('f', self.env_sensor_data.rh))
