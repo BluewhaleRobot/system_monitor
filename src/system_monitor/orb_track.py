@@ -183,15 +183,15 @@ def do_security():
     STATUS_LOCK.release()
 
 
-def deal_car_status(car_status):
-    global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
-    with STATUS_LOCK:
-        status = car_status.data
-        if status == 2:
-            BAR_FLAG = True
-            CAMERA_CURRENT_TIME = rospy.Time.now()
-        else:
-            BAR_FLAG = False
+# def deal_car_status(car_status):
+#     global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
+#     with STATUS_LOCK:
+#         status = car_status.data
+#         if status == 2:
+#             BAR_FLAG = True
+#             CAMERA_CURRENT_TIME = rospy.Time.now()
+#         else:
+#             BAR_FLAG = False
 
 def deal_car_status(car_twist_msg):
     global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME

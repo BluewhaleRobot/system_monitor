@@ -67,7 +67,7 @@ def get_scan(scan):
     rplidar_flag = True
 
 def init_sub_pubs():
-    rospy.init_node("remote_server", anonymous=True)
+    rospy.init_node("remote_server")
     rospy.Subscriber("/global_move_flag", Bool, get_global_move_flag)
     rospy.Subscriber('/scan', LaserScan, get_scan)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
@@ -80,7 +80,7 @@ def init_sub_pubs():
     CHARGE_POSE_PUB = rospy.Publisher(
         '/bw_auto_dock/dockposition_save', Bool, queue_size=0)
     GALILEO_STATUS_PUB = rospy.Publisher(
-        '/galileo/status', GalileoStatus, queue_size=0)
+        '~galileo/status', GalileoStatus, queue_size=0)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
