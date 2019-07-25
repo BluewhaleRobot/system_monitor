@@ -72,6 +72,7 @@ class MonitorServer(threading.Thread):
         self.charge_pub = pubs["CHARGE_PUB"]
         self.charge_pose_pub = pubs["CHARGE_POSE_PUB"]
         self.audio_pub = pubs["AUDIO_PUB"]
+        self.poweroff_pub = pubs["POWEROFF_PUB"]
 
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
@@ -147,6 +148,9 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     rospy.loginfo("system poweroff")
                     self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
+                    poweroff_flag = Bool()
+                    poweroff_flag.data = True
+                    self.poweroff_pub.publish(poweroff_flag)
                     time.sleep(6)
                     rospy.loginfo("system poweroff2")
                     commands.getstatusoutput(

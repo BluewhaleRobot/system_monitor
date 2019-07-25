@@ -82,6 +82,7 @@ def init_sub_pubs():
     GALILEO_STATUS_PUB = rospy.Publisher(
         '/galileo/status', GalileoStatus, queue_size=0)
     AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
+    POWEROFF_PUB = rospy.Publisher('/xqserial_server/poweroff', Bool, queue_size=1)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
@@ -92,6 +93,7 @@ def init_sub_pubs():
         "CHARGE_PUB": CHARGE_PUB,
         "CHARGE_POSE_PUB": CHARGE_POSE_PUB,
         "AUDIO_PUB": AUDIO_PUB,
+        "POWEROFF_PUB": POWEROFF_PUB,
     }
 
 
