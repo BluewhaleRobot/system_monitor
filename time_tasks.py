@@ -43,7 +43,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 print('event type: {event.event_type}  path : {event.src_path}')
 
 def status_update_cb(status):
-    global NAV_STATUS
+    global NAV_STATUS,STATUS_LOCK
     with STATUS_LOCK:
         NAV_STATUS = status.navStatus
 
@@ -124,7 +124,7 @@ class MapSwitchTask():
         return False
 
     def job_needdone(self):
-        global NAV_STATUS,AUDIO_PUB,GALILEO_PUB
+        global NAV_STATUS,AUDIO_PUB,GALILEO_PUB,STATUS_LOCK
         AUDIO_PUB.publish("开始切换地图")
         #切换地图过程，发布导航服务开启禁用话题
         STATUS_LOCK.acquire()
@@ -144,9 +144,9 @@ class MapSwitchTask():
             galileo_cmds.data = 'm' + chr(0x04)
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
-            GALILEO_PUB.publish(galileo_cmds)
             max_do = 0
             while nav_status == 1:
+                GALILEO_PUB.publish(galileo_cmds)
                 time.sleep(3)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
@@ -160,15 +160,15 @@ class MapSwitchTask():
             galileo_cmds.data = 'm' + chr(0x00)
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
-            GALILEO_PUB.publish(galileo_cmds)
             max_do = 0
             while nav_status != 1:
-                time.sleep(3)
+                GALILEO_PUB.publish(galileo_cmds)
+                time.sleep(30)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
                 STATUS_LOCK.release()
                 max_do = max_do +1;
-                if max_do >20:
+                if max_do >10:
                     break
             return
         else:
