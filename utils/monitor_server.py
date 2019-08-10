@@ -243,10 +243,10 @@ class MonitorServer(threading.Thread):
                     elePose.data = cmds[count][1]
                     self.elevator_pub.publish(elePose)
                 elif cmds[count][0] == ord('m'):
-                    if not rospy.get_param("/system_monitor/nav_is_enabled", True):
-                        continue
                     time1_diff = time_now - self.last_nav_time
                     if cmds[count][1] == 0:
+                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
+                            continue
                         if time1_diff.to_sec() < 5:
                             continue
                         rospy.loginfo("开启视觉，不巡检")
@@ -296,6 +296,9 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
                     if cmds[count][1] == 5:
+                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
+                            continue
+
                         if not rospy.get_param("/system_monitor/nav_is_enabled", True):
                             continue
                         rospy.loginfo("开启自动巡检")
