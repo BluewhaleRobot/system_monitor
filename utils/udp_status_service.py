@@ -77,7 +77,7 @@ class UDPStatusService(threading.Thread):
             self.env_sensor_data.pm1_0 = sensorData.pm1_0 #ug/m^3
             self.env_sensor_data.pm2_5 = sensorData.pm2_5 #ug/m^3
             self.env_sensor_data.pm10 = sensorData.pm10 #ug/m^3
-            self.env_sensor_data.illuminance = sensorData.illuminance #lx
+            self.env_sensor_data.lel = sensorData.lel #ppm
             self.env_sensor_data.noise = sensorData.noise #db
 
         if useEnvSensors == 0:
@@ -163,7 +163,7 @@ class UDPStatusService(threading.Thread):
                 self.send_data2[16:20] = map(ord, struct.pack('f', self.env_sensor_data.pm1_0))
                 self.send_data2[20:24] = map(ord, struct.pack('f', self.env_sensor_data.pm2_5))
                 self.send_data2[24:28] = map(ord, struct.pack('f', self.env_sensor_data.pm10))
-                self.send_data2[28:32] = map(ord, struct.pack('f', self.env_sensor_data.illuminance))
+                self.send_data2[28:32] = map(ord, struct.pack('f', self.env_sensor_data.lel))
                 self.send_data2[32:36] = map(ord, struct.pack('f', self.env_sensor_data.noise))
                 self.send_data2[3] = len(self.send_data2) - 4
                 self.monitor_server.sendto(bytes(self.send_data2))
