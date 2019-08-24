@@ -64,19 +64,22 @@ class IotClient():
         self.connect_flag = False
 
         def on_connect(session_flag, rc, userdata):
-            print("Connected")
-            self.connect_flag = True
+            if rc == 0:
+                rospy.loginfo("IOT connected")
+                self.connect_flag = True
 
         def on_disconnect(rc, userdata):
-            print("Disconnected")
+            rospy.loginfo("IOT disconnected")
 
         self.lk.on_connect = on_connect
         self.lk.on_disconnect = on_disconnect
-
+        
         self.lk.connect_async()
 
-        while not self.connect_flag:
+        while not self.connect_flag and not rospy.is_shutdown():
             time.sleep(1)
+        if rospy.is_shutdown():
+            return
 
         if is_robot:
             _rc, _mid = self.lk.subscribe_topic(
