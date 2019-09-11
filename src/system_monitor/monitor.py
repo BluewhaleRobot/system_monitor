@@ -85,24 +85,6 @@ def get_power(power):
             ROBOT_STATUS.power = power.data
         POWER_LAST = power.data
 
-        if ROBOT_STATUS.power>0 and ROBOT_STATUS.power<POWER_LOW:
-            rospy.loginfo("system poweroff because power low 1")
-            AUDIO_PUB.publish("电量低，请充满电后再继续使用，系统将在2分钟后自动关机！")
-            # 等待语音播放完毕
-            time.sleep(8)
-            if rosservice.get_service_node("/motor_driver/shutdown") is not None:
-                # call shutdown service
-                rospy.wait_for_service('/motor_driver/shutdown')
-                shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
-                req = ShutdownRequest()
-                req.flag = True
-                rospy.logwarn("Call shutdown service")
-                res = shutdown_rpc(req)
-                rospy.logwarn(res)
-            rospy.loginfo("system poweroff because power low 2")
-            commands.getstatusoutput(
-                'sudo shutdown -h now')
-
 def get_odom(odom):
     with STATUS_LOCK:
         if odom != None:

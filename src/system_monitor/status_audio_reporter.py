@@ -8,18 +8,26 @@ import time
 import rosservice
 import subprocess
 import os
+import time
+import commands
+
+from utils.config import POWER_LOW
 
 PREVISOUS_STATUS = None
 BLOCK_TIME_COUNT = 0
 STOP_TIME_COUNT = 0
 PREVIOUS_GREETING_FLAG = False
 
+POWER_NOW = 0.0
+WARN_TIME_COUNT = 0
+POWER_TIME_COUNT = 0
+
 if __name__ == "__main__":
     rospy.init_node("status_audio_reporter")
     audio_pub = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=10)
 
     def status_update_cb(status):
-        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT
+        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT
         if PREVISOUS_STATUS == None:
             PREVISOUS_STATUS = status
             PREVIOUS_GREETING_FLAG = rospy.get_param(
@@ -52,6 +60,40 @@ if __name__ == "__main__":
         if BLOCK_TIME_COUNT >= 1000: # 等待3秒
             BLOCK_TIME_COUNT = -16000 # 每19秒说一次
             audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+
+        POWER_NOW = POWER_NOW*0.8 + status.power*0.2
+        POWER_TIME_COUNT = POWER_TIME_COUNT +1
+
+        if POWER_TIME_COUNT > 300 and POWER_NOW < POWER_LOW and POWER_NOW > 1.0 and status.mapStatus !=1 and status.targetStatus !=1 :
+            POWER_TIME_COUNT = 301
+            if status.navStatus != 1 or status.targetNumID <=0 :
+                #在厨房位置不工作就要切断电源
+                WARN_TIME_COUNT = 0
+                rospy.loginfo("system poweroff because power low 1 %f",POWER_NOW)
+                audio_pub.publish("电量低，请充满电后再继续使用，系统将在2分钟后自动关机！")
+                # 等待语音播放完毕
+                time.sleep(8)
+                if rosservice.get_service_node("/motor_driver/shutdown") is not None:
+                    # call shutdown service
+                    rospy.wait_for_service('/motor_driver/shutdown')
+                    shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
+                    req = ShutdownRequest()
+                    req.flag = True
+                    rospy.logwarn("Call shutdown service")
+                    res = shutdown_rpc(req)
+                    rospy.logwarn(res)
+                rospy.loginfo("system poweroff because power low 2")
+                commands.getstatusoutput(
+                    'sudo shutdown -h now')
+            else:
+                #不在厨房位置则需要提示
+                WARN_TIME_COUNT += (1000 / 30)
+                if WARN_TIME_COUNT >= 1000: # 等待1秒
+                    WARN_TIME_COUNT = -16000 # 每17秒说一次
+                    audio_pub.publish("电量低，请充满电后再继续使用！")
+        else:
+            WARN_TIME_COUNT = 0
+
         # 5min不动则关闭雷达
         if abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
             STOP_TIME_COUNT += (1000 / 30)
@@ -59,7 +101,7 @@ if __name__ == "__main__":
             STOP_TIME_COUNT = 0
         if STOP_TIME_COUNT >= 5 * 60 * 1000:
             if rospy.get_param("/rplidar_node_manager/keep_running", True):
-                rospy.set_param("/rplidar_node_manager/keep_running", False)   
+                rospy.set_param("/rplidar_node_manager/keep_running", False)
         else:
             if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                 rospy.set_param("/rplidar_node_manager/keep_running", True)
