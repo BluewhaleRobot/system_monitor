@@ -64,7 +64,7 @@ if __name__ == "__main__":
         POWER_NOW = POWER_NOW*0.8 + status.power*0.2
         POWER_TIME_COUNT = POWER_TIME_COUNT +1
 
-        if POWER_TIME_COUNT > 300 and POWER_NOW < POWER_LOW and POWER_NOW > 1.0 and status.mapStatus !=1 and status.targetStatus !=1 :
+        if POWER_TIME_COUNT > 300 and POWER_NOW < POWER_LOW and status.power > 1.0 and status.mapStatus !=1 and status.targetStatus !=1 :
             POWER_TIME_COUNT = 301
             if status.navStatus != 1 or status.targetNumID <=0 :
                 #在厨房位置不工作就要切断电源
