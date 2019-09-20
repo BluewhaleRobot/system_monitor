@@ -4,6 +4,7 @@
 import rospy
 from std_msgs.msg import String
 from galileo_serial_server.msg import GalileoStatus
+from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 import time
 import rosservice
 import subprocess
