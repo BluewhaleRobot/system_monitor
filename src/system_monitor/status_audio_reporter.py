@@ -62,11 +62,12 @@ if __name__ == "__main__":
             BLOCK_TIME_COUNT = -16000 # 每19秒说一次
             audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
 
-        POWER_NOW = POWER_NOW*0.8 + status.power*0.2
-        POWER_TIME_COUNT = POWER_TIME_COUNT +1
+        if status.power > 5.0:
+            POWER_NOW = POWER_NOW*0.8 + status.power*0.2
+            POWER_TIME_COUNT = POWER_TIME_COUNT +1
 
-        if POWER_TIME_COUNT > 300 and POWER_NOW < POWER_LOW and status.power > 1.0 and status.mapStatus !=1 and status.targetStatus !=1 :
-            POWER_TIME_COUNT = 301
+        if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.mapStatus !=1 and status.targetStatus !=1 :
+            POWER_TIME_COUNT = 601
             if status.navStatus != 1 or status.targetNumID <=0 :
                 #在厨房位置不工作就要切断电源
                 WARN_TIME_COUNT = 0
