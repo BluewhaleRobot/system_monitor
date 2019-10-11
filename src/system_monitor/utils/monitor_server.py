@@ -47,7 +47,9 @@ from system_monitor.msg import Status
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
 from map_service import MapService
 from nav_task import NavigationTask
+from schedule_nav_task import ScheduleNavTask
 from navigation_service import NavigationService
+from schedule_service import ScheduleService
 from req_parser import ReqParser
 from utils import stop_process
 
@@ -273,11 +275,37 @@ class MonitorServer(threading.Thread):
                         self.tilt_pub.publish(tilt_degree)
                         if self.nav_thread.stopped():
                             self.nav_thread.setspeed(0)
+                            self.nav_thread = NavigationService(self.galileo_status, self.galileo_status_lock)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()
                             self.nav_task = NavigationTask()
-                    if cmds[count][1] == 4:
+                    # 开启调度导航
+                    if cmds[count][1] == 7:
+                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
+                            continue
+                        if time1_diff.to_sec() < 5:
+                            continue
+                        rospy.loginfo("开启视觉，不巡检")
+                        rospy.loginfo("关闭视觉")
+                        if not self.map_thread.stopped():
+                            rospy.loginfo("关闭视觉2")
+                            self.map_thread.stop()
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
+                        self.last_nav_time = time_now
+                        tilt_degree = Int16()
+                        tilt_degree.data = -19
+                        self.tilt_pub.publish(tilt_degree)
+                        if self.nav_thread.stopped():
+                            self.nav_thread.setspeed(0)
+                            self.nav_thread = ScheduleService(self.galileo_status, self.galileo_status_lock)
+                            self.nav_thread.start()
+                            if self.nav_task is not None:
+                                self.nav_task.shutdown()
+                            self.nav_task = ScheduleNavTask()
+                    if cmds[count][1] == 4 or cmds[count][1] == 8:
                         rospy.loginfo("关闭自主巡检")
 
                         rospy.loginfo("关闭视觉")
@@ -304,6 +332,7 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map1.launch'")
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
+                        os.system("pkill -f 'roslaunch lagrange_navigation navigation.launch'")
                     if cmds[count][1] == 5:
                         if not rospy.get_param("/system_monitor/nav_is_enabled", True):
                             continue

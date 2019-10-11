@@ -183,7 +183,7 @@ class NavigationTask():
                         waypoint.pose.orientation = Quaternion(*q_angle)
             else:
                 angles = []
-                plan_mode = 0;
+                plan_mode = 0
 
                 with open(self.new_nav_points_file, "r") as new_nav_data_file:
                     new_nav_data_str = new_nav_data_file.readline()
