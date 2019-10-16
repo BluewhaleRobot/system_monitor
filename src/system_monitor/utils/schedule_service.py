@@ -46,6 +46,7 @@ class ScheduleService(threading.Thread):
         self.speed = 1
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
         if self.p != None:
@@ -76,6 +77,8 @@ class ScheduleService(threading.Thread):
             cmd = "roslaunch lagrange_navigation navigation.launch"
         elif self.speed == 0:
             cmd = "roslaunch lagrange_navigation navigation.launch"
+        if self.fake_flag:
+            cmd = "roslaunch lagrange_navigation fake.launch"
 
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH

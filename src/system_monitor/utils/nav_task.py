@@ -317,7 +317,7 @@ class NavigationTask():
         self.current_pose_stamped.header.frame_id = "odom"
         try:
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
@@ -332,7 +332,7 @@ class NavigationTask():
         try:
             self.current_pose_stamped.header.frame_id = "odom"
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1

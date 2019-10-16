@@ -108,7 +108,7 @@ class ScheduleNavTask():
         try:
             self.current_pose_stamped.header.frame_id = "odom"
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
