@@ -96,6 +96,8 @@ def init_sub_pubs():
 if __name__ == "__main__":
     pubs = init_sub_pubs()
     rate = rospy.Rate(10)
+
+    useEnvSensors = rospy.get_param("~useEnvSensors", 0) #默认为0 表示不使用环境监测数据
     # 配置udp广播
     s = socket(AF_INET, SOCK_DGRAM)
     s.bind(('', 0))
@@ -116,7 +118,7 @@ if __name__ == "__main__":
 
     # UDP系统状态发布线程
     udp_status_service = UDPStatusService(monitor_server, galileo_status_service.galileo_status,
-                                          galileo_status_service.galileo_status_lock)
+                                          galileo_status_service.galileo_status_lock,useEnvSensors)
     udp_status_service.start()
 
     broadcast_count = 10  # 每1秒播放一次声音
@@ -141,13 +143,7 @@ if __name__ == "__main__":
                 sub_process_thread = None
             else:
                 cmd = None
-                if galileo_status.visualStatus != -1 and not rplidar_flag:
-                    # 打开雷达电机
-                    if rosservice.get_service_node("/start_motor") is not None:
-                        cmd = "rosservice call /start_motor"
-                        sub_process_thread = subprocess.Popen(
-                            cmd, shell=True, env=new_env)
-                elif rplidar_flag and galileo_status.visualStatus == -1:
+                if rplidar_flag and galileo_status.visualStatus == -1:
                     # 关闭雷达电机
                     if rosservice.get_service_node("/stop_motor") is not None:
                         cmd = "rosservice call /stop_motor"
