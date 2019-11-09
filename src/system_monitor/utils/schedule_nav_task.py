@@ -17,6 +17,7 @@ class ScheduleNavTask():
     def __init__(self):
         self.loop_running_flag = False
         self.sleep_time = 0
+        self.current_goal_lock = threading.RLock()
         self.current_goal_id = -1
         self.current_pose_stamped_map = None
         self.current_pose_stamped = None
@@ -49,25 +50,26 @@ class ScheduleNavTask():
             except Exception as e:
                 print(e)
             if res is not None:
-                if res.status_code == 200:
-                    task_info = json.loads(res.content.decode("utf-8"))
-                    self.current_goal = PoseStamped()
-                    self.current_goal.header.frame_id = "map"
-                    self.current_goal.header.stamp = rospy.Time.now()
-                    self.current_goal.pose.position.x = task_info["x"]
-                    self.current_goal.pose.position.y = task_info["y"]
-                    self.current_goal.pose.position.z = 0
-                    q_angle = quaternion_from_euler(
-                        0, 0, task_info["theta"], axes='sxyz')
-                    q = Quaternion(*q_angle)
-                    self.current_goal.pose.orientation = q
-                    self.current_goal_id = -1
-                    self.goal_state = task_info["state"]
-                else:
-                    # 当前无任务
-                    self.current_goal = None
-                    self.current_goal_id = -1
-                    self.goal_state = "FREE"
+                with self.current_goal_lock:
+                    if res.status_code == 200:
+                        task_info = json.loads(res.content.decode("utf-8"))
+                        self.current_goal = PoseStamped()
+                        self.current_goal.header.frame_id = "map"
+                        self.current_goal.header.stamp = rospy.Time.now()
+                        self.current_goal.pose.position.x = task_info["x"]
+                        self.current_goal.pose.position.y = task_info["y"]
+                        self.current_goal.pose.position.z = 0
+                        q_angle = quaternion_from_euler(
+                            0, 0, task_info["theta"], axes='sxyz')
+                        q = Quaternion(*q_angle)
+                        self.current_goal.pose.orientation = q
+                        self.current_goal_id = -1
+                        self.goal_state = task_info["state"]
+                    else:
+                        # 当前无任务
+                        self.current_goal = None
+                        self.current_goal_id = -1
+                        self.goal_state = "FREE"
             time.sleep(1)
 
     def shutdown(self):
@@ -130,7 +132,12 @@ class ScheduleNavTask():
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
-        return self.pose_distance(self.current_goal.pose, self.current_pose_stamped_map.pose)
+        with self.current_goal_lock:
+            if self.current_goal is None:
+                return -1
+            if self.current_pose_stamped_map is None:
+                return -1
+            return self.pose_distance(self.current_goal.pose, self.current_pose_stamped_map.pose)
 
     def pose_distance(self, pose1, pose2):
         return math.sqrt(math.pow((pose1.position.x - pose2.position.x), 2)
