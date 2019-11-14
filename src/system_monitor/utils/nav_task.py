@@ -42,16 +42,20 @@ from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_conjugate
 import rosparam
 
-from config import TF_ROT, TF_TRANS
+from config import TF_ROT, TF_TRANS, ENTER_WAIT_TIME, FORWARD_DISTANCE
 from scipy.spatial.distance import cdist
 from scipy import optimize
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
 from actionlib_msgs.msg import GoalStatus
+from galileo_msg.msg import LocalMoveAction, LocalMoveGoal
 
 
 class NavigationTask():
 
-    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv", nav_path_file="/home/xiaoqiang/slamdb/path.csv", new_nav_points_file="/home/xiaoqiang/slamdb/new_nav.csv"):
+    def __init__(self, nav_points_file="/home/xiaoqiang/slamdb/nav.csv", 
+        nav_path_file="/home/xiaoqiang/slamdb/path.csv", 
+        new_nav_points_file="/home/xiaoqiang/slamdb/new_nav.csv",
+    ):
         self.nav_points_file = nav_points_file
         self.new_nav_points_file = new_nav_points_file
         self.tf_rot = TF_ROT
@@ -66,6 +70,12 @@ class NavigationTask():
         self.move_base.wait_for_server(rospy.Duration(1))
         rospy.loginfo("Connected to move base server")
         rospy.loginfo("Starting navigation test")
+        # 局域运动控制
+        self.local_move = actionlib.SimpleActionClient(
+            "local_move", LocalMoveAction)
+        rospy.loginfo("Waiting for local control action server...")
+        self.local_move.wait_for_server(rospy.Duration(1))
+        rospy.loginfo("Connected to local control server")
         self.current_pose_stamped = None
         self.current_pose_stamped_map = None
         self.status_lock = threading.Lock()
@@ -140,7 +150,8 @@ class NavigationTask():
                 # 通过全局规划器，计算目标点的朝向
                 rospy.loginfo("waiting for move_base/make_plan service")
                 rospy.wait_for_service("/move_base/make_plan")
-                rospy.loginfo("waiting for move_base/make_plan service succeed")
+                rospy.loginfo(
+                    "waiting for move_base/make_plan service succeed")
                 make_plan = rospy.ServiceProxy('/move_base/make_plan', GetPlan)
                 for waypoint in self.waypoints:
                     req = GetPlanRequest()
@@ -162,7 +173,8 @@ class NavigationTask():
                         if len(plan_path_2d) < 4:
                             rospy.logwarn(
                                 "Not enough point to calculate direction")
-                            raise ValueError("Not enough point to calculate direction")
+                            raise ValueError(
+                                "Not enough point to calculate direction")
                         angle = self.get_target_direction(
                             [waypoint.pose.position.x, waypoint.pose.position.y], plan_path_2d)
                         if waypoint == self.waypoints[0]:
@@ -250,14 +262,39 @@ class NavigationTask():
         goal.target_pose = self.waypoints[goal_id]
 
         def done_cb(status, result):
+            if status == GoalStatus.SUCCEEDED and self.current_goal_id == 0:
+                # 处理0号点
+                self.local_move.cancel_all_goals()
+                # 如果是0号点则调用惯导前进
+                forward_goal = LocalMoveGoal()
+                forward_goal.distance = FORWARD_DISTANCE
+                forward_goal.angle = 0
+                forward_goal.method = 1
+                self.local_move.send_goal(forward_goal)
+                res = self.local_move.wait_for_result()
+                if not res:
+                    # 任务执行失败或取消
+                    self.goal_status = "FREE"
+                    return
+                # 等待一会
+                timecount = 0
+                self.enter_wait_flag = True
+                while timecount < ENTER_WAIT_TIME and self.enter_wait_flag:
+                    time.sleep(0.1)
+                    timecount += 0.1
+                if not self.enter_wait_flag:
+                    # 任务取消
+                    self.goal_status = "FREE"
+                    return
+                # 调用惯导后退1
+                backward_goal = LocalMoveGoal()
+                backward_goal.distance = -FORWARD_DISTANCE
+                backward_goal.angle = 0
+                backward_goal.method = 0
+                self.local_move.send_goal(backward_goal)
+                res = self.local_move.wait_for_result()
+                # 完成任务
             self.goal_status = "FREE"
-            # if status == GoalStatus.SUCCEEDED:
-            #     target_names = ["A", "B", "C", "D", "E", "F", "G"]
-            #     target_desp = ["蓝鲸智能机器人为您服务", "等待乘客上车，十秒后出发",
-            #                    "正在加油，十秒后加油完成，完成后出发", "感谢乘坐本次班车，蓝鲸智能机器人为您服务", "", "", "", "", "", ""]
-            #     if goal_id < len(target_names):
-            #         self.audio_pub.publish("到达{name}号目标点，{target_desp}"
-            #                            .format(name=target_names[goal_id], target_desp=target_desp[goal_id]))
         # wait for 1s
         if not self.move_base.wait_for_server(rospy.Duration(1)):
             self.goal_status = "ERROR"
@@ -284,6 +321,8 @@ class NavigationTask():
     def cancel_goal(self):
         if self.current_goal_status() != "FREE":
             self.move_base.cancel_goal()
+            self.enter_wait_flag = False
+            self.local_move.cancel_goal()
             self.cmd_vel_pub.publish(Twist())
         self.current_goal_id = -1
         self.goal_status = "FREE"
@@ -520,7 +559,6 @@ class NavigationTask():
             return (-1 / abs(A1), 1)
         elif delta_x < 0 and delta_y < 0:
             return (-1 / abs(A1), -1)
-
 
     def closest_node(self, node, nodes):
         filtered_nodes = filter(
