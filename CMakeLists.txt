@@ -38,3 +38,19 @@ add_executable(galileo_status_relay
 target_link_libraries(galileo_status_relay
    ${catkin_LIBRARIES}
 )
+
+message("Init system_monitor config ...")
+execute_process(
+  COMMAND "${PROJECT_SOURCE_DIR}/script/init.sh"
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE error
+  RESULT_VARIABLE result
+)
+
+if("${result}" STREQUAL "0")
+  message("${output}")
+  message("Init system monitor config success")
+else()
+  message("${error}")
+  message(FATAL_ERROR "Init system monitor config failed")
+endif()
