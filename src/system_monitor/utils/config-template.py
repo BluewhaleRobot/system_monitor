@@ -45,6 +45,6 @@ ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' +
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
 SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.log"
 IOT_SECRET = "Jbk3GLKIZYIRrTgthbAEa9TlXHdae5UL"
-IOT_KEY = "a1Eb29fVWHG"
+IOT_KEY = ""
 IOT_PASSWORD = "xiaoqiang"
 VERSION = "2.1.0"

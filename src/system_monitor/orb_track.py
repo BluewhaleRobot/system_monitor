@@ -100,7 +100,7 @@ class TrackTask(threading.Thread):
         self.wait(3)
         car_twist.angular.z = -0.3
         VEL_PUB.publish(car_twist)
-        self.wait(8)
+        self.wait(3)
         car_twist.angular.z = 0.
         VEL_PUB.publish(car_twist)
         ORB_TRACK_THREAD = None
@@ -257,11 +257,13 @@ def init():
     globalMoveFlag.data = True
     GLOBAL_MOVE_PUB.publish(globalMoveFlag)
 
-    while not ORB_INIT_FLAG and not rospy.is_shutdown() and ENABLE_MOVE_FLAG:
+    rot_num = 0
+    while rot_num < 10 and not ORB_INIT_FLAG and not rospy.is_shutdown() and ENABLE_MOVE_FLAG:
         if ORB_TRACK_THREAD == None:
             ORB_TRACK_THREAD = TrackTask()
             ORB_TRACK_THREAD.start()
             time.sleep(6)
+            rot_num = rot_num + 1
         time.sleep(1)
     if ORB_TRACK_THREAD != None:
         ORB_TRACK_THREAD.stop()

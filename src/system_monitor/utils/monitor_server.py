@@ -163,7 +163,7 @@ class MonitorServer(threading.Thread):
                     self.global_move_pub.publish(global_move_flag)
                     if cmds[count][1] > 1:
                         self.speed_cmd.angular.z = max(
-                            0.4, MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
+                            0.2, MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
                     else:
                         self.speed_cmd.angular.z = MAX_THETA * \
                             cmds[count][1] / 100.0 / temp_scale
@@ -174,7 +174,7 @@ class MonitorServer(threading.Thread):
                     self.global_move_pub.publish(global_move_flag)
                     if cmds[count][1] > 1:
                         self.speed_cmd.angular.z = min(
-                            -0.4, -MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
+                            -0.2, -MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
                     else:
                         self.speed_cmd.angular.z = -MAX_THETA * \
                             cmds[count][1] / 100.0 / temp_scale
@@ -367,7 +367,7 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == ord("g") and cmds[count][1] == ord("r"):
                     if self.nav_task is not None:
                         self.nav_task.reset_goals()
-                
+
                 # set loop and sleep time
                 if cmds[count][0] == ord("m") and cmds[count][1] == 5:
                     if self.nav_thread.stopped():
