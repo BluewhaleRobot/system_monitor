@@ -48,4 +48,3 @@ IOT_SECRET = "Jbk3GLKIZYIRrTgthbAEa9TlXHdae5UL"
 IOT_KEY = "a1Eb29fVWHG"
 IOT_PASSWORD = "xiaoqiang"
 VERSION = "2.1.0"
-
