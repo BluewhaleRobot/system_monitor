@@ -54,20 +54,20 @@ if __name__ == "__main__":
         else:
             STOP_TIME_COUNT = 0
         new_env = os.environ.copy()
-        if STOP_TIME_COUNT >= 5 * 60 * 1000:
-            if rospy.get_param("/rplidar_node_manager/keep_running", True):
-                rospy.set_param("/rplidar_node_manager/keep_running", False)
-                if rosservice.get_service_node("/stop_motor") is not None:
-                    cmd = "rosservice call /stop_motor"
-                    subprocess.Popen(
-                        cmd, shell=True, env=new_env)
-        else:
-            if not rospy.get_param("/rplidar_node_manager/keep_running", True):
-                rospy.set_param("/rplidar_node_manager/keep_running", True)
-                if rosservice.get_service_node("/start_motor") is not None:
-                    cmd = "rosservice call /start_motor"
-                    subprocess.Popen(
-                        cmd, shell=True, env=new_env)
+        # if STOP_TIME_COUNT >= 5 * 60 * 1000:
+        #     if rospy.get_param("/rplidar_node_manager/keep_running", True):
+        #         rospy.set_param("/rplidar_node_manager/keep_running", False)
+        #         if rosservice.get_service_node("/stop_motor") is not None:
+        #             cmd = "rosservice call /stop_motor"
+        #             subprocess.Popen(
+        #                 cmd, shell=True, env=new_env)
+        # else:
+        #     if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+        #         rospy.set_param("/rplidar_node_manager/keep_running", True)
+        #         if rosservice.get_service_node("/start_motor") is not None:
+        #             cmd = "rosservice call /start_motor"
+        #             subprocess.Popen(
+        #                 cmd, shell=True, env=new_env)
 
         PREVIOUS_GREETING_FLAG = rospy.get_param(
             "/xiaoqiang_greeting_node/is_enabled", False)
