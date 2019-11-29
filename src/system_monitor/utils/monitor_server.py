@@ -39,7 +39,7 @@ import tf
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from geometry_msgs.msg import Pose, Pose2D, PoseStamped, Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int16, String, UInt32
+from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
 from system_monitor.msg import Status
 
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
@@ -71,6 +71,7 @@ class MonitorServer(threading.Thread):
         self.tilt_pub = pubs["TILT_PUB"]
         self.charge_pub = pubs["CHARGE_PUB"]
         self.charge_pose_pub = pubs["CHARGE_POSE_PUB"]
+        self.audio_pub = pubs["AUDIO_PUB"]
 
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
@@ -145,6 +146,9 @@ class MonitorServer(threading.Thread):
                 # 判断是否为关机命令
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     rospy.loginfo("system poweroff")
+                    self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
+                    # 等待语音播放完毕
+                    time.sleep(6)
                     commands.getstatusoutput(
                         'sudo shutdown -h now')
 

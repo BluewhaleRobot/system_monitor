@@ -32,7 +32,7 @@ import rospy
 from galileo_serial_server.msg import GalileoStatus
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int32
+from std_msgs.msg import Bool, Float64, Int32,Float32
 from tf.transformations import euler_from_quaternion
 import tf
 
@@ -117,7 +117,7 @@ class GalileoStatusService(threading.Thread):
         self.charge_sub = rospy.Subscriber(
             "/bw_auto_dock/Chargestatus", Int32, update_charge_status)
         self.power_sub = rospy.Subscriber(
-            "/xqserial_server/Power", Float64, update_power)
+            "/bw_auto_dock/Batterypower", Float32, update_power)
         self.current_speed_sub = rospy.Subscriber(
             "/cmd_vel", Twist, update_control_speed)
         self.control_speed_sub = rospy.Subscriber(
