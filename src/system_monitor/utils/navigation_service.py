@@ -47,6 +47,7 @@ class NavigationService(threading.Thread):
         self.speed = 1
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
         if self.p != None:

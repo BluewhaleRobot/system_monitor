@@ -82,6 +82,7 @@ def init_sub_pubs():
     GALILEO_STATUS_PUB = rospy.Publisher(
         '~galileo/status', GalileoStatus, queue_size=0)
     AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
+    POWEROFF_PUB = rospy.Publisher('/xqserial_server/poweroff', Bool, queue_size=1)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
@@ -92,6 +93,7 @@ def init_sub_pubs():
         "CHARGE_PUB": CHARGE_PUB,
         "CHARGE_POSE_PUB": CHARGE_POSE_PUB,
         "AUDIO_PUB": AUDIO_PUB,
+        "POWEROFF_PUB": POWEROFF_PUB,
     }
 
 
@@ -143,13 +145,7 @@ if __name__ == "__main__":
                 sub_process_thread = None
             else:
                 cmd = None
-                if galileo_status.visualStatus != -1 and not rplidar_flag:
-                    # 打开雷达电机
-                    if rosservice.get_service_node("/start_motor") is not None:
-                        cmd = "rosservice call /start_motor"
-                        sub_process_thread = subprocess.Popen(
-                            cmd, shell=True, env=new_env)
-                elif rplidar_flag and galileo_status.visualStatus == -1:
+                if rplidar_flag and galileo_status.visualStatus == -1:
                     # 关闭雷达电机
                     if rosservice.get_service_node("/stop_motor") is not None:
                         cmd = "rosservice call /stop_motor"
