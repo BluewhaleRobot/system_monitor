@@ -274,8 +274,8 @@ class MonitorServer(threading.Thread):
                         tilt_degree.data = -19
                         self.tilt_pub.publish(tilt_degree)
                         if self.nav_thread.stopped():
-                            self.nav_thread.setspeed(0)
                             self.nav_thread = NavigationService(self.galileo_status, self.galileo_status_lock)
+                            self.nav_thread.setspeed(0)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()
@@ -299,8 +299,8 @@ class MonitorServer(threading.Thread):
                         tilt_degree.data = -19
                         self.tilt_pub.publish(tilt_degree)
                         if self.nav_thread.stopped():
-                            self.nav_thread.setspeed(0)
                             self.nav_thread = ScheduleService(self.galileo_status, self.galileo_status_lock)
+                            self.nav_thread.setspeed(0)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()
