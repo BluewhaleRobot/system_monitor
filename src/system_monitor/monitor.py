@@ -42,7 +42,6 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, UInt32, Int32, String
 from system_monitor.msg import Status
 from xiaoqiang_log.msg import LogRecord
-from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 
 from utils.config import POWER_LOW
 
