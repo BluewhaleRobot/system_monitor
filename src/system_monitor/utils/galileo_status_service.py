@@ -117,7 +117,7 @@ class GalileoStatusService(threading.Thread):
         self.charge_sub = rospy.Subscriber(
             "/bw_auto_dock/Chargestatus", Int32, update_charge_status)
         self.power_sub = rospy.Subscriber(
-            "/bw_auto_dock/Batterypower", Float32, update_power)
+            "/xqserial_server/Power", Float64, update_power)
         self.current_speed_sub = rospy.Subscriber(
             "/cmd_vel", Twist, update_control_speed)
         self.control_speed_sub = rospy.Subscriber(
