@@ -29,10 +29,11 @@ import threading
 import time
 
 import rospy
+import rostopic
 from galileo_serial_server.msg import GalileoStatus
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int32,Float32
+from std_msgs.msg import Bool, Float64, Int32, Float32
 from tf.transformations import euler_from_quaternion
 import tf
 
@@ -96,6 +97,8 @@ class GalileoStatusService(threading.Thread):
             self.charge_status = status.data
 
         def update_power(power):
+            if power.data == 0:
+                return
             self.power_time = int(time.time() * 1000)
             self.power = power.data
 
@@ -116,8 +119,11 @@ class GalileoStatusService(threading.Thread):
             "/ORB_SLAM/GBA", Bool, update_gba_status)
         self.charge_sub = rospy.Subscriber(
             "/bw_auto_dock/Chargestatus", Int32, update_charge_status)
+
         self.power_sub = rospy.Subscriber(
             "/bw_auto_dock/Batterypower", Float32, update_power)
+        self.power_sub2 = rospy.Subscriber(
+            "/xqserial_server/Power", Float64, update_power)
         self.current_speed_sub = rospy.Subscriber(
             "/cmd_vel", Twist, update_control_speed)
         self.control_speed_sub = rospy.Subscriber(
@@ -129,6 +135,7 @@ class GalileoStatusService(threading.Thread):
         self.gba_sub.unregister()
         self.charge_sub.unregister()
         self.power_sub.unregister()
+        self.power_sub2.unregister()
         self.current_speed_sub.unregister()
         self.control_speed_sub.unregister()
         self._stop.set()
