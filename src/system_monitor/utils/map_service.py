@@ -69,7 +69,15 @@ class MapService(threading.Thread):
 
     def run(self):
         self._stop.clear()
+        # 多摄像头参数，0表示使用前摄像头建图，1表示使用后摄像头建图
+        camera_id = int(rospy.get_param("~camera_id", -1))
         cmd = "roslaunch ORB_SLAM2 map.launch"
+        if camera_id == 0:
+            cmd = "roslaunch ORB_SLAM2 map_front.launch"
+        if camera_id == 1:
+            cmd = "roslaunch ORB_SLAM2 map_back.launch"
+        if self.fake_flag:
+            cmd = "roslaunch ORB_SLAM2 map_fake.launch"
         if self.update:
             cmd = "roslaunch nav_test update_map.launch"
         new_env = os.environ.copy()
