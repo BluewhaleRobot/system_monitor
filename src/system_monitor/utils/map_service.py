@@ -61,6 +61,12 @@ class MapService(threading.Thread):
             for child in self.ps_process.children(recursive=True):
                 child.kill()
             self.ps_process.kill()
+        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+        os.system("pkill -f 'roslaunch ORB_SLAM2 map_front.launch'")
+        os.system("pkill -f 'roslaunch ORB_SLAM2 map_back.launch'")
+        os.system("pkill -f 'roslaunch ORB_SLAM2 map_fake.launch'")
+        os.system("pkill -f 'roslaunch ORB_SLAM2 update.launch'")
+        os.system("pkill -f 'roslaunch ORB_SLAM2 update_fake.launch'")
         self.P = None
         self._stop.set()
         self.__init__(self.galileo_status, self.galileo_status_lock)
@@ -80,9 +86,9 @@ class MapService(threading.Thread):
         if self.fake_flag:
             cmd = "roslaunch ORB_SLAM2 map_fake.launch"
         if self.update:
-            cmd = "roslaunch nav_test update_map.launch"
+            cmd = "roslaunch ORB_SLAM2 update.launch"
             if self.fake_flag:
-                cmd = "roslaunch nav_test update_map_fake.launch"
+                cmd = "roslaunch ORB_SLAM2 update_fake.launch"
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
         while not self.stopped() and not rospy.is_shutdown():

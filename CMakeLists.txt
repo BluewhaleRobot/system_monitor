@@ -10,11 +10,17 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   message_generation
+  dynamic_reconfigure
 )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/src
+)
+
+
+generate_dynamic_reconfigure_options(
+  cfg/system_monitor.cfg
 )
 
 add_message_files(

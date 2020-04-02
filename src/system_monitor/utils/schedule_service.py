@@ -41,53 +41,75 @@ class ScheduleService(threading.Thread):
         super(ScheduleService, self).__init__()
         self._stop = threading.Event()
         self._stop.set()
-        self.p = None
-        self.ps_process = None
-        self.speed = 1
+        self.p_slam = None
+        self.ps_process_slam = None
+        self.p_navigation = None
+        self.ps_process_navigation = None
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.fake_flag = rospy.get_param("~fake", False)
+        self.navigation_cmd = "roslaunch lagrange_navigation navigation.launch"
+        self.slam_cmd = "roslaunch lagrange_navigation slam.launch"
+        if self.fake_flag:
+            self.slam_cmd = "roslaunch lagrange_navigation slam_fake.launch"
+
 
     def stop(self):
-        if self.p != None:
-            try:
-                self.ps_process = psutil.Process(pid=self.p.pid)
-                for child in self.ps_process.children(recursive=True):
-                    child.kill()
-                self.ps_process.kill()
-            except Exception:
-                pass
-        self.p = None
+        self.stop_slam()
+        self.stop_navigation()
         self._stop.set()
         self.__init__(self.galileo_status, self.galileo_status_lock)
+
+    def stop_slam(self):
+        if self.p_slam != None:
+            try:
+                self.ps_process_slam = psutil.Process(pid=self.p_slam.pid)
+                for child in self.ps_process_slam.children(recursive=True):
+                    child.kill()
+                self.ps_process_slam.kill()
+            except Exception:
+                pass
+        os.system("pkill -f 'roslaunch lagrange_navigation slam.launch'")
+        os.system("pkill -f 'roslaunch lagrange_navigation slam_fake.launch'")
+    
+    def stop_navigation(self):
+        if self.p_navigation != None:
+            try:
+                self.ps_process_navigation = psutil.Process(pid=self.p_navigation.pid)
+                for child in self.ps_process_navigation.children(recursive=True):
+                    child.kill()
+                self.ps_process_navigation.kill()
+            except Exception:
+                pass
+        os.system("pkill -f 'roslaunch lagrange_navigation navigation.launch'")
+        self.p_navigation = None
 
     def stopped(self):
         return self._stop.isSet()
 
-    def setspeed(self, speed):
-        self.speed = speed
-
     def run(self):
         self._stop.clear()
-        if self.speed == 1:
-            cmd = "roslaunch lagrange_navigation navigation.launch"
-        elif self.speed == 2:
-            cmd = "roslaunch lagrange_navigation navigation.launch"
-        elif self.speed == 3:
-            cmd = "roslaunch lagrange_navigation navigation.launch"
-        elif self.speed == 0:
-            cmd = "roslaunch lagrange_navigation navigation.launch"
-        if self.fake_flag:
-            cmd = "roslaunch lagrange_navigation fake.launch"
-
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
+        if self.p_navigation == None and not self.stopped():
+            self.p_navigation = subprocess.Popen(self.navigation_cmd, shell=True, env=new_env)
+            self.ps_process_navigation = psutil.Process(pid=self.p_navigation.pid)
         while not self.stopped() and not rospy.is_shutdown():
-            if self.p == None and not self.stopped():
-                self.p = subprocess.Popen(cmd, shell=True, env=new_env)
-                self.ps_process = psutil.Process(pid=self.p.pid)
+            if self.p_slam == None and not self.stopped():
+                self.p_slam = subprocess.Popen(self.slam_cmd, shell=True, env=new_env)
+                self.ps_process_slam = psutil.Process(pid=self.p_slam.pid)
             else:
-                if not self.ps_process.is_running():
+                if not self.ps_process_slam.is_running():
                     break
             time.sleep(0.1)
         self.stop()
+
+    def reload(self):
+        if self.stopped():
+            return
+        # restart lagrange_navigation navigation.launch
+        self.stop_navigation()
+        new_env = os.environ.copy()
+        new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
+        self.p_navigation = subprocess.Popen(self.navigation_cmd, shell=True, env=new_env)
+        self.ps_process_navigation = psutil.Process(pid=self.p_navigation.pid)
