@@ -55,9 +55,9 @@ class ScheduleService(threading.Thread):
 
 
     def stop(self):
+        self._stop.set()
         self.stop_slam()
         self.stop_navigation()
-        self._stop.set()
         self.__init__(self.galileo_status, self.galileo_status_lock)
 
     def stop_slam(self):

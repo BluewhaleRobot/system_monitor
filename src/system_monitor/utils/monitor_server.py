@@ -231,12 +231,14 @@ class MonitorServer(threading.Thread):
                             rospy.loginfo("停止建图程序")
                             self.map_thread.stop()
                     elif cmds[count][1] == 2:
-                        rospy.loginfo("保存地图")
-                        mapSaveFlag = Bool()
-                        mapSaveFlag.data = True
-                        self.map_save_pub.publish(mapSaveFlag)
-                        if self.map_thread.scale_orb_thread != None:
-                            self.map_thread.scale_orb_thread.save_scale()
+                        rospy.logwarn("不再支持串口保存地图协议")
+                        continue
+                        # rospy.loginfo("保存地图")
+                        # mapSaveFlag = Bool()
+                        # mapSaveFlag.data = True
+                        # self.map_save_pub.publish(mapSaveFlag)
+                        # if self.map_thread.scale_orb_thread != None:
+                        #     self.map_thread.scale_orb_thread.save_scale()
                     elif cmds[count][1] == 3:
                         rospy.loginfo("更新地图")
                         if self.map_thread.stopped():
@@ -266,7 +268,6 @@ class MonitorServer(threading.Thread):
                         if self.nav_thread.stopped():
                             rospy.loginfo("开启导航程序")
                             self.nav_thread = NavigationService(self.galileo_status, self.galileo_status_lock)
-                            self.nav_thread.setspeed(0)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()
@@ -289,7 +290,6 @@ class MonitorServer(threading.Thread):
                         if self.nav_thread.stopped():
                             rospy.loginfo("开启调度导航程序")
                             self.nav_thread = ScheduleService(self.galileo_status, self.galileo_status_lock)
-                            self.nav_thread.setspeed(0)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()

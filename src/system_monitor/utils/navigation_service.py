@@ -34,6 +34,9 @@ import psutil
 import rospy
 
 from config import ROS_PACKAGE_PATH
+from pymongo import MongoClient
+from actionlib.simple_action_client import SimpleActionClient
+from ORB_SLAM2.msg import LoadMapAction, LoadMapActionGoal
 
 
 class NavigationService(threading.Thread):
@@ -49,15 +52,15 @@ class NavigationService(threading.Thread):
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.fake_flag = rospy.get_param("~fake", False)
-        self.navigation_cmd = "roslaunch xiaoqiang_navigation navigation.launch"
-        self.slam_cmd = "roslaunch xiaoqiang_navigation slam.launch"
+        self.navigation_cmd = "roslaunch galileo_navigation navigation.launch"
+        self.slam_cmd = "roslaunch galileo_navigation slam.launch"
         if self.fake_flag:
-            self.slam_cmd = "roslaunch xiaoqiang_navigation slam_fake.launch"
+            self.slam_cmd = "roslaunch galileo_navigation slam_fake.launch"
 
     def stop(self):
+        self._stop.set()
         self.stop_slam()
         self.stop_navigation()
-        self._stop.set()
         self.__init__(self.galileo_status, self.galileo_status_lock)
 
     def stop_slam(self):
@@ -69,8 +72,8 @@ class NavigationService(threading.Thread):
                 self.ps_process_slam.kill()
             except Exception:
                 pass
-        os.system("pkill -f 'roslaunch xiaoqiang_navigation slam.launch'")
-        os.system("pkill -f 'roslaunch xiaoqiang_navigation slam_fake.launch'")
+        os.system("pkill -f 'roslaunch galileo_navigation slam.launch'")
+        os.system("pkill -f 'roslaunch galileo_navigation slam_fake.launch'")
         self.p_slam = None
     
     def stop_navigation(self):
@@ -82,7 +85,7 @@ class NavigationService(threading.Thread):
                 self.ps_process_navigation.kill()
             except Exception:
                 pass
-        os.system("pkill -f 'roslaunch xiaoqiang_navigation navigation.launch'")
+        os.system("pkill -f 'roslaunch galileo_navigation navigation.launch'")
         self.p_navigation = None
 
 
@@ -100,6 +103,21 @@ class NavigationService(threading.Thread):
             if self.p_slam == None and not self.stopped():
                 self.p_slam = subprocess.Popen(self.slam_cmd, shell=True, env=new_env)
                 self.ps_process_slam = psutil.Process(pid=self.p_slam.pid)
+                # 同时载入默认地图
+                c = MongoClient()
+                db = c["bwbot_galileo_debug"]["config"]
+                config_data = db.find_one({})
+                map_name = config_data["default_map"]
+                if map_name == "":
+                    continue
+                client = SimpleActionClient("/ORB_SLAM2/map_load", LoadMapAction)
+                client.wait_for_server()
+                goal = LoadMapActionGoal()
+                goal.goal.map_name = map_name
+                client.send_goal(goal.goal)
+                load_state = client.wait_for_result()
+                if not load_state:
+                    break
             else:
                 if not self.ps_process_slam.is_running():
                     break
@@ -109,7 +127,7 @@ class NavigationService(threading.Thread):
     def reload(self):
         if self.stopped():
             return
-        # restart xiaoqiang_navigation navigation.launch
+        # restart galileo_navigation navigation.launch
         self.stop_navigation()
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
