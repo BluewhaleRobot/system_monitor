@@ -349,15 +349,14 @@ class MonitorServer(threading.Thread):
                         self.nav_thread.reload()
                         if self.nav_task is not None:
                             self.nav_task.shutdown()
-                            self.nav_task = None
+                        # 重新载入导航任务
+                        self.nav_task = NavigationTask()
                         tilt_degree = Int16()
                         tilt_degree.data = 0
                         self.tilt_pub.publish(tilt_degree)
                         self.speed_cmd.linear.x = 0
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
-                        # 重新载入导航任务
-                        self.nav_task = NavigationTask()
                     
                     if cmds[count][1] == 10:
                         # 重载调度导航路径
@@ -367,15 +366,14 @@ class MonitorServer(threading.Thread):
                         self.nav_thread.reload()
                         if self.nav_task is not None:
                             self.nav_task.shutdown()
-                            self.nav_task = None
+                        # 重新载入导航任务
+                        self.nav_task = ScheduleNavTask()
                         tilt_degree = Int16()
                         tilt_degree.data = 0
                         self.tilt_pub.publish(tilt_degree)
                         self.speed_cmd.linear.x = 0
                         self.speed_cmd.angular.z = 0
                         self.cmd_vel_pub.publish(self.speed_cmd)
-                        # 重新载入导航任务
-                        self.nav_task = ScheduleNavTask()
 
 
                 elif cmds[count][0] == ord('g'):
