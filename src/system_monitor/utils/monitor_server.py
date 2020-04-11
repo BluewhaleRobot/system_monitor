@@ -241,6 +241,20 @@ class MonitorServer(threading.Thread):
                         #     self.map_thread.scale_orb_thread.save_scale()
                     elif cmds[count][1] == 3:
                         rospy.loginfo("更新地图")
+
+                        if self.nav_task is not None:
+                            rospy.loginfo("停止导航任务")
+                            self.nav_task.shutdown()
+                            self.nav_task = None
+                        tilt_degree = Int16()
+                        tilt_degree.data = 0
+                        self.tilt_pub.publish(tilt_degree)
+                        if not self.nav_thread.stopped():
+                            self.nav_thread.stop()
+                        self.speed_cmd.linear.x = 0
+                        self.speed_cmd.angular.z = 0
+                        self.cmd_vel_pub.publish(self.speed_cmd)
+                        
                         if self.map_thread.stopped():
                             rospy.loginfo("启动更新程序")
                             self.map_thread.update = True

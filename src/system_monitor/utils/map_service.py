@@ -35,6 +35,9 @@ import rospy
 
 from config import ROS_PACKAGE_PATH
 from scale_orb import ScaleORB
+from pymongo import MongoClient
+from actionlib.simple_action_client import SimpleActionClient
+from ORB_SLAM2.msg import LoadMapAction, LoadMapActionGoal
 
 
 class MapService(threading.Thread):
@@ -95,6 +98,22 @@ class MapService(threading.Thread):
             if self.P == None and not self.stopped():
                 self.P = subprocess.Popen(cmd, shell=True, env=new_env)
                 self.ps_process = psutil.Process(pid=self.P.pid)
+                if self.update:
+                    # 同时载入更新地图
+                    c = MongoClient()
+                    db = c["bwbot_galileo_debug"]["config"]
+                    config_data = db.find_one({})
+                    map_name = config_data["default_map"]
+                    if map_name == "":
+                        continue
+                    client = SimpleActionClient("/ORB_SLAM2/map_load", LoadMapAction)
+                    client.wait_for_server()
+                    goal = LoadMapActionGoal()
+                    goal.goal.map_name = map_name
+                    client.send_goal(goal.goal)
+                    load_state = client.wait_for_result()
+                    if not load_state:
+                        break
             else:
                 if self.ps_process.is_running():
                     if self.scale_orb_thread == None:
