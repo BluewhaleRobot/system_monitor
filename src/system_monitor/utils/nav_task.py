@@ -267,6 +267,7 @@ class NavigationTask():
         if not self.move_base.wait_for_server(rospy.Duration(1)):
             self.goal_status = "ERROR"
             self.cancel_goal()
+            rospy.logerr("Move base server not started")
             return
         self.move_base.send_goal(goal, done_cb=done_cb)
 
