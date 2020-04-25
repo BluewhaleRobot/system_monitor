@@ -32,6 +32,7 @@ import time
 
 import psutil
 import rospy
+import roslaunch
 
 from config import ROS_PACKAGE_PATH
 
@@ -70,6 +71,7 @@ class NavigationService(threading.Thread):
 
     def run(self):
         self._stop.clear()
+        self.astrapro_launch = None
         if self.speed == 1:
             cmd = "roslaunch nav_test tank_blank_map1.launch"
         elif self.speed == 2:
@@ -78,6 +80,7 @@ class NavigationService(threading.Thread):
             cmd = "roslaunch nav_test tank_blank_map3.launch"
         elif self.speed == 0:
             cmd = "roslaunch nav_test tank_blank_map0.launch"
+
 
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
