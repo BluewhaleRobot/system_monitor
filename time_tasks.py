@@ -38,7 +38,7 @@ GALILEO_PUB = None
 
 TASK_LIST = list()
 
-POWER_LOW = 37
+POWER_LOW = 11.5
 
 POWER_NOW = 0
 
@@ -719,7 +719,7 @@ if __name__ == "__main__":
 
     status_sub = rospy.Subscriber("/galileo/status", GalileoStatus, status_update_cb)
 
-    POWER_LOW = float(rospy.get_param("~power_low", "37.0"))
+    POWER_LOW = float(rospy.get_param("~power_low", "11.5"))
     #开始从json文件中加载地图切换任务
     time.sleep(60) #先等待开机1分钟
     load_tasks()
