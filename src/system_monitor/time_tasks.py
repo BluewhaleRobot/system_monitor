@@ -17,9 +17,9 @@ from datetime import datetime
 import shutil
 import threading
 import schedule
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 import requests
+import hashlib
+import threading
 
 MAPS_DB_PATH = "/home/xiaoqiang/saved-slamdb"
 CURRENT_DB_PATH = "/home/xiaoqiang/slamdb"
@@ -46,14 +46,31 @@ CHARGE_FLAG = 0
 
 POWER_RECORDS = []
 
-class FileChangeHandler(FileSystemEventHandler):
-    def on_modified(self, event):
+class FileChangeHandler():
+    def __init__(self):
+        global MAPS_DB_PATH
+        self.md5_last_value = None
+        if os.path.exists(MAPS_DB_PATH+"/timeTask.json"):
+            taskfile = open(MAPS_DB_PATH+"/timeTask.json",'rb')
+            self.md5_last_value = hashlib.md5(taskfile.read()).hexdigest()
+            taskfile.close()
+    def if_changed(self):
         global FILESTATUS_LOCK,TASKFILE_STATUS,MAPS_DB_PATH
         with FILESTATUS_LOCK:
-            taskfile_path = MAPS_DB_PATH+"/timeTask.json"
-            if event.src_path == taskfile_path:
+            self.md5_value = None
+            TASKFILE_STATUS = 0
+            if os.path.exists(MAPS_DB_PATH+"/timeTask.json"):
+                taskfile = open(MAPS_DB_PATH+"/timeTask.json",'rb')
+                self.md5_value = hashlib.md5(taskfile.read()).hexdigest()
+                taskfile.close()
+            if self.md5_value == self.md5_last_value:
+                TASKFILE_STATUS = 0
+                return False
+            else:
+                self.md5_last_value = self.md5_value
                 TASKFILE_STATUS = 1
-                print('event type: {event.event_type}  path : {event.src_path}')
+                return True
+
 
 def status_update_cb(status):
     global NAV_STATUS,STATUS_LOCK,POWER_NOW,CHARGE_FLAG,POWER_RECORDS
@@ -287,7 +304,7 @@ class AutoRunTask():
                     task_details = r.json()
                     self.looptask_state = task_details["state"]
 
-                    if task_details["loop_count"] >= (self.loopCount - self.loopCountlast):
+                    if self.loopCount >0 and task_details["loop_count"] >= (self.loopCount - self.loopCountlast):
                         self.looptaskflag = True
                         self.loopCountlast = task_details["loop_count"]
                         return True
@@ -689,7 +706,7 @@ def load_tasks():
             if TASK_LIST[index_task].ifneed_runnow() :
                 #任务需要立即运行
                 #print "runnow " + str(index_task)
-                job_now.run()
+                threading._start_new_thread(job_now.run, ())
             index_task = index_task + 1
 
 if __name__ == "__main__":
@@ -708,10 +725,7 @@ if __name__ == "__main__":
     load_tasks()
     index_i = 0
 
-    event_handler = FileChangeHandler()
-    observer = Observer()
-    observer.schedule(event_handler, path=MAPS_DB_PATH, recursive=False)
-    observer.start()
+    filechange_handler = FileChangeHandler()
 
     while not rospy.is_shutdown():
         #任务最多每分钟执行一次
@@ -719,6 +733,7 @@ if __name__ == "__main__":
         #每10分钟检查一下任务是否要重新载入
         if index_i >=3:
             index_i = 0
+            filechange_handler.if_changed()
             FILESTATUS_LOCK.acquire()
             if TASKFILE_STATUS == 1:
                  TASKFILE_STATUS = 0
@@ -727,5 +742,3 @@ if __name__ == "__main__":
 
         index_i = index_i +1
         time.sleep(60)
-    observer.stop()
-    observer.join()
