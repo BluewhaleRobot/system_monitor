@@ -149,8 +149,8 @@ if __name__ == "__main__":
                     # 关闭雷达电机
                     if rosservice.get_service_node("/stop_motor") is not None:
                         cmd = "rosservice call /stop_motor"
-                        sub_process_thread = subprocess.Popen(
-                            cmd, shell=True, env=new_env)
+                        # sub_process_thread = subprocess.Popen(
+                        #     cmd, shell=True, env=new_env)
         if heart_beat_count == 1:
             rplidar_flag = False
 
