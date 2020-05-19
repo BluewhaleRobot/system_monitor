@@ -55,7 +55,7 @@ if __name__ == "__main__":
             WARN_TIME_COUNT += (1000 / 30)
             if WARN_TIME_COUNT >= 1000: # 等待1秒
                 WARN_TIME_COUNT = -26000 # 每27秒说一次
-                audio_pub.publish("电量低，请充满电后再继续使用！")    
+                audio_pub.publish("电量低，请充满电后再继续使用！")
 
         # 被挡住提示
         if status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
@@ -63,7 +63,7 @@ if __name__ == "__main__":
             BLOCK_TIME_COUNT += (1000 / 30)
         else:
             BLOCK_TIME_COUNT = 0
-        if BLOCK_TIME_COUNT >= 5000:
+        if BLOCK_TIME_COUNT >= 8000:
             BLOCK_TIME_COUNT = -10000
             audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
         # 5min不动则关闭雷达
