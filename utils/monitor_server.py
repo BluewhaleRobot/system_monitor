@@ -163,7 +163,7 @@ class MonitorServer(threading.Thread):
                     self.global_move_pub.publish(global_move_flag)
                     if cmds[count][1] > 1:
                         self.speed_cmd.angular.z = max(
-                            0.4, MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
+                            0.2, MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
                     else:
                         self.speed_cmd.angular.z = MAX_THETA * \
                             cmds[count][1] / 100.0 / temp_scale
@@ -174,7 +174,7 @@ class MonitorServer(threading.Thread):
                     self.global_move_pub.publish(global_move_flag)
                     if cmds[count][1] > 1:
                         self.speed_cmd.angular.z = min(
-                            -0.4, -MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
+                            -0.2, -MAX_THETA * cmds[count][1] / 100.0 / temp_scale)
                     else:
                         self.speed_cmd.angular.z = -MAX_THETA * \
                             cmds[count][1] / 100.0 / temp_scale
