@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -42,7 +42,7 @@ from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_conjugate
 import rosparam
 
-from config import TF_ROT, TF_TRANS
+from .config import TF_ROT, TF_TRANS
 from scipy.spatial.distance import cdist
 from scipy import optimize
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetMapResponse
@@ -312,7 +312,7 @@ class NavigationTask():
         self.current_pose_stamped.header.frame_id = "odom"
         try:
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
@@ -327,7 +327,7 @@ class NavigationTask():
         try:
             self.current_pose_stamped.header.frame_id = "odom"
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
@@ -391,7 +391,7 @@ class NavigationTask():
             return
         with self.status_lock:
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         current_pose = self.current_pose_stamped_map.pose
         current_pose_q = [current_pose.orientation.x, current_pose.orientation.y,
                           current_pose.orientation.z, current_pose.orientation.w]

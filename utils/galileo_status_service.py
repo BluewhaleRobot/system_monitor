@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -203,7 +203,7 @@ class GalileoStatusService(threading.Thread):
                     try:
                         current_pose_stamped.header.frame_id = "base_link"
                         current_pose_stamped_map = self.listener.transformPose(
-                            "/map", current_pose_stamped)
+                            "map", current_pose_stamped)
                     except (tf.LookupException, tf.ConnectivityException,
                             tf.ExtrapolationException, tf.Exception) as e:
                         rospy.logwarn(e)

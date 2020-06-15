@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -25,7 +25,7 @@
 # Author: Randoms, Xie fusheng
 #
 
-import commands
+from subprocess import Popen
 import os
 import struct
 import threading
@@ -42,12 +42,12 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from system_monitor.msg import Status
 
-from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
-from map_service import MapService
-from nav_task import NavigationTask
-from navigation_service import NavigationService
-from req_parser import ReqParser
-from utils import stop_process
+from .config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
+from .map_service import MapService
+from .nav_task import NavigationTask
+from .navigation_service import NavigationService
+from .req_parser import ReqParser
+from .utils import stop_process
 
 
 class MonitorServer(threading.Thread):
@@ -114,7 +114,7 @@ class MonitorServer(threading.Thread):
                 break
             dataList = []
             for c in data:
-                dataList.append(ord(c))
+                dataList.append(c)
             self.parse_data(self.parser.unpack_req(dataList))  # 处理命令数据
         self.stop()
 
@@ -145,8 +145,8 @@ class MonitorServer(threading.Thread):
                 # 判断是否为关机命令
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     rospy.loginfo("system poweroff")
-                    commands.getstatusoutput(
-                        'sudo shutdown -h now')
+                    shutdown_cmd = Popen('sudo shutdown -h now', shell=True)
+                    shutdown_cmd.wait()
 
                 if cmds[count][0] == ord('f'):
                     rospy.loginfo("forward")

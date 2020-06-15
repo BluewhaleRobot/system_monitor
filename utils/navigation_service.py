@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -33,7 +33,7 @@ import time
 import psutil
 import rospy
 
-from config import ROS_PACKAGE_PATH
+from .config import ROS_PACKAGE_PATH
 
 
 class NavigationService(threading.Thread):

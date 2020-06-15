@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -36,7 +36,7 @@ from geometry_msgs.msg import Pose, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from bw_env_sensors.msg import EnvSensors
 
-from config import BROADCAST_PORT, ROS_PACKAGE_PATH, TF_ROT, TF_TRANS
+from .config import BROADCAST_PORT, ROS_PACKAGE_PATH, TF_ROT, TF_TRANS
 
 
 class UDPStatusService(threading.Thread):
@@ -108,23 +108,20 @@ class UDPStatusService(threading.Thread):
         num_i = 0
         while not self.stopped() and not rospy.is_shutdown():
             with self.galileo_status_lock:
-                self.send_data[4:8] = map(ord, struct.pack('f', self.galileo_status.currentPosX))
-                self.send_data[8:12] = map(ord, struct.pack('f', self.galileo_status.currentPosY))
-                self.send_data[12:16] = map(ord, struct.pack('f', 0))
-                self.send_data[16:20] = map(
-                    ord, struct.pack('f', self.galileo_status.power))
-                self.send_data[24:28] = map(
-                    ord, struct.pack('f', self.galileo_status.currentAngle))
-                self.send_data[28:32] = map(ord, struct.pack(
-                    'i', self.galileo_status.targetStatus))
-                self.send_data[32:36] = map(ord, struct.pack(
-                    'i', self.galileo_status.targetNumID))
-                self.send_data[40:44] = map(ord, struct.pack(
-                    'i', self.galileo_status.loopStatus))
-                self.send_data[36:40] = map(ord, struct.pack(
-                    'i', self.galileo_status.chargeStatus))
-                self.send_data[44:48] = map(
-                    ord, struct.pack('f', self.galileo_status.targetDistance))
+                self.send_data[4:8] = struct.pack('f', self.galileo_status.currentPosX)
+                self.send_data[8:12] = struct.pack('f', self.galileo_status.currentPosY)
+                self.send_data[12:16] = struct.pack('f', 0)
+                self.send_data[16:20] = struct.pack('f', self.galileo_status.power)
+                self.send_data[24:28] = struct.pack('f', self.galileo_status.currentAngle)
+                self.send_data[28:32] = struct.pack(
+                    'i', self.galileo_status.targetStatus)
+                self.send_data[32:36] = struct.pack(
+                    'i', self.galileo_status.targetNumID)
+                self.send_data[40:44] = struct.pack(
+                    'i', self.galileo_status.loopStatus)
+                self.send_data[36:40] = struct.pack(
+                    'i', self.galileo_status.chargeStatus)
+                self.send_data[44:48] = struct.pack('f', self.galileo_status.targetDistance)
 
                 if self.galileo_status.navStatus == 1:
                     statu0 = 0x01  # 导航状态
@@ -157,14 +154,14 @@ class UDPStatusService(threading.Thread):
 
             if self.envSensor_flag and  num_i >= 3:
                 num_i = 0
-                self.send_data2[4:8] = map(ord, struct.pack('f', self.env_sensor_data.temperature))
-                self.send_data2[8:12] = map(ord, struct.pack('f', self.env_sensor_data.rh))
-                self.send_data2[12:16] = map(ord, struct.pack('f', self.env_sensor_data.smoke))
-                self.send_data2[16:20] = map(ord, struct.pack('f', self.env_sensor_data.pm1_0))
-                self.send_data2[20:24] = map(ord, struct.pack('f', self.env_sensor_data.pm2_5))
-                self.send_data2[24:28] = map(ord, struct.pack('f', self.env_sensor_data.pm10))
-                self.send_data2[28:32] = map(ord, struct.pack('f', self.env_sensor_data.lel))
-                self.send_data2[32:36] = map(ord, struct.pack('f', self.env_sensor_data.noise))
+                self.send_data2[4:8] = struct.pack('f', self.env_sensor_data.temperature)
+                self.send_data2[8:12] = struct.pack('f', self.env_sensor_data.rh)
+                self.send_data2[12:16] = struct.pack('f', self.env_sensor_data.smoke)
+                self.send_data2[16:20] = struct.pack('f', self.env_sensor_data.pm1_0)
+                self.send_data2[20:24] = struct.pack('f', self.env_sensor_data.pm2_5)
+                self.send_data2[24:28] = struct.pack('f', self.env_sensor_data.pm10)
+                self.send_data2[28:32] = struct.pack('f', self.env_sensor_data.lel)
+                self.send_data2[32:36] = struct.pack('f', self.env_sensor_data.noise)
                 self.send_data2[3] = len(self.send_data2) - 4
                 self.monitor_server.sendto(bytes(self.send_data2))
                 # l = [hex(int(j)) for j in self.send_data2]

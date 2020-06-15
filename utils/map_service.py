@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -33,8 +33,8 @@ import time
 import psutil
 import rospy
 
-from config import ROS_PACKAGE_PATH
-from scale_orb import ScaleORB
+from .config import ROS_PACKAGE_PATH
+from .scale_orb import ScaleORB
 
 
 class MapService(threading.Thread):
