@@ -73,7 +73,7 @@ def galileo_status_logger(status):
             "type": "WORKING",
             "duration": current_stamp - work_stamp_start,
             "timestamp": int(time.time() * 1000),
-            "target": status.targetNumID,
+            "goal_index": status.targetNumID,
             "map": "" if current_map_info is None else current_map_info["map_name"],
             "path": "" if current_map_info is None else current_map_info["path_name"]
         })
@@ -103,7 +103,7 @@ def galileo_status_logger(status):
             "type": "WORKING",
             "duration": current_stamp - work_stamp_start,
             "timestamp": int(time.time() * 1000),
-            "target": status.targetNumID,
+            "goal_index": status.targetNumID,
             "map": "" if current_map_info is None else current_map_info["map_name"],
             "path": "" if current_map_info is None else current_map_info["path_name"]
         })
@@ -117,7 +117,7 @@ def galileo_status_logger(status):
             "type": "PAUSED",
             "duration": current_stamp - pause_stamp_start,
             "timestamp": int(time.time() * 1000),
-            "target": status.targetNumID,
+            "goal_index": status.targetNumID,
             "map": "" if current_map_info is None else current_map_info["map_name"],
             "path": "" if current_map_info is None else current_map_info["path_name"]
         })
@@ -131,7 +131,7 @@ def galileo_status_logger(status):
             "type": "WORKING",
             "duration": current_stamp - work_stamp_start,
             "timestamp": int(time.time() * 1000),
-            "target": status.targetNumID,
+            "goal_index": status.targetNumID,
             "map": "" if current_map_info is None else current_map_info["map_name"],
             "path": "" if current_map_info is None else current_map_info["path_name"]
         })
@@ -160,7 +160,7 @@ def galileo_status_logger(status):
             "type": "PAUSED",
             "duration": current_stamp - pause_stamp_start,
             "timestamp": int(time.time() * 1000),
-            "target": status.targetNumID,
+            "goal_index": status.targetNumID,
             "map": "" if current_map_info is None else current_map_info["map_name"],
             "path": "" if current_map_info is None else current_map_info["path_name"]
         })
