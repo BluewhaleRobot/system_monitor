@@ -68,14 +68,14 @@ if __name__ == "__main__":
                 #audio_pub.publish("好的，我回去了，您慢用！")
                 pass
             # 被挡住提示
-            if not MOVE_FLAG or (status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
+            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
                 # 被人挡住了,在 WORKING 状态但是没有动
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 1000: # 等待3秒
-                BLOCK_TIME_COUNT = -16000 # 每19秒说一次
-                audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+                BLOCK_TIME_COUNT = -13000 # 每19秒说一次
+                audio_pub.publish("请让开一下，谢谢，机器人努力工作中！")
 
             if status.power > 5.0:
                 POWER_NOW = POWER_NOW*0.8 + status.power*0.2
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                 WARN_TIME_COUNT = 0
 
             # 5min不动则关闭雷达
-            if abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            if PREVISOUS_STATUS.navStatus==1 and status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
             else:
                 STOP_TIME_COUNT = 0
