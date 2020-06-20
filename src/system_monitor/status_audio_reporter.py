@@ -8,9 +8,11 @@ import time
 import rosservice
 import subprocess
 import os
-from utils.config import POWER_LOW
+import time
+import commands
 from std_msgs.msg import Bool, UInt32, Int32
 import threading
+from utils.config import POWER_LOW
 
 PREVISOUS_STATUS = None
 BLOCK_TIME_COUNT = 0
@@ -82,7 +84,7 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = -10000
                 audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
             # 5min不动则关闭雷达
-            if abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            if PREVISOUS_STATUS.navStatus==1 and status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
             else:
                 STOP_TIME_COUNT = 0
