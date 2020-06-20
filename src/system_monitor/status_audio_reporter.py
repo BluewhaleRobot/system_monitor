@@ -75,7 +75,7 @@ if __name__ == "__main__":
                     audio_pub.publish("电量低，请充满电后再继续使用！")
 
             # 被挡住提示
-            if not MOVE_FLAG or (status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
+            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
                 # 被人挡住了,在 WORKING 状态但是没有动
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
