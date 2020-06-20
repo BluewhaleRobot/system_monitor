@@ -62,19 +62,6 @@ if __name__ == "__main__":
                 audio_pub.publish("开启迎宾模式")
             if PREVIOUS_GREETING_FLAG and not rospy.get_param("/xiaoqiang_greeting_node/is_enabled", False):
                 audio_pub.publish("关闭迎宾模式")
-            if status.navStatus == 1 and PREVISOUS_STATUS.targetNumID != 0 and status.targetNumID == 0:
-                # 返回厨房提示
-                #audio_pub.publish("好的，我回去了，您慢用！")
-                pass
-            # 被挡住提示
-            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
-                # 被人挡住了,在 WORKING 状态但是没有动
-                BLOCK_TIME_COUNT += (1000 / 30)
-            else:
-                BLOCK_TIME_COUNT = 0
-            if BLOCK_TIME_COUNT >= 1000: # 等待3秒
-                BLOCK_TIME_COUNT = -13000 # 每19秒说一次
-                audio_pub.publish("请让开一下，谢谢，机器人努力工作中！")
 
             if status.power > 5.0:
                 POWER_NOW = POWER_NOW*0.8 + status.power*0.2
@@ -89,7 +76,7 @@ if __name__ == "__main__":
                     audio_pub.publish("电量低，请充满电后再继续使用！")
 
             # 被挡住提示
-            if status.targetStatus == 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
                 # 被人挡住了,在 WORKING 状态但是没有动
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
@@ -122,8 +109,8 @@ if __name__ == "__main__":
                 "/xiaoqiang_greeting_node/is_enabled", False)
             PREVISOUS_STATUS = status
 
-    status_sub = rospy.Subscriber(
-        "/galileo/status", GalileoStatus, status_update_cb)
+    status_sub = rospy.Subscriber("/galileo/status", GalileoStatus, status_update_cb)
     status_sub2 = rospy.Subscriber("/move_base/StatusFlag", Int32, moveflag_update_cb)
+
     while not rospy.is_shutdown():
         time.sleep(1)
