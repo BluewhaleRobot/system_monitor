@@ -39,7 +39,6 @@ if __name__ == "__main__":
             else:
                 MOVE_FLAG = True
 
-
     def status_update_cb(status):
         global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT
         global MOVE_FLAG
@@ -74,8 +73,9 @@ if __name__ == "__main__":
             else:
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 1000: # 等待3秒
-                BLOCK_TIME_COUNT = -16000 # 每19秒说一次
+                BLOCK_TIME_COUNT = -13000 # 每14秒说一次
                 audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+                MOVE_FLAG = True
 
             if status.power > 5.0:
                 POWER_NOW = POWER_NOW*0.8 + status.power*0.2
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                 WARN_TIME_COUNT = 0
 
             # 5min不动则关闭雷达
-            if PREVISOUS_STATUS.navStatus==1 and status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
             else:
                 STOP_TIME_COUNT = 0
@@ -122,6 +122,12 @@ if __name__ == "__main__":
             else:
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
+
+            #第一次开启服务时需要打开雷达，因为机器人开启运动要几秒，提高安全
+            if PREVISOUS_STATUS.navStatus == 0 and status.navStatus == 1:
+                if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+                    rospy.set_param("/rplidar_node_manager/keep_running", True)
+
             PREVIOUS_GREETING_FLAG = rospy.get_param(
                 "/xiaoqiang_greeting_node/is_enabled", False)
             PREVISOUS_STATUS = status
