@@ -33,7 +33,6 @@ System status will be published at /system_monitor/report
 import json
 import threading
 import time
-import commands
 
 import rospy
 import rosservice

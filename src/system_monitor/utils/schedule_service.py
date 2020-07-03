@@ -33,7 +33,7 @@ import time
 import psutil
 import rospy
 
-from config import ROS_PACKAGE_PATH
+from .config import ROS_PACKAGE_PATH
 
 
 class ScheduleService(threading.Thread):
