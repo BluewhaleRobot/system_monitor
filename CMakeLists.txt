@@ -7,8 +7,14 @@ project(system_monitor)
 find_package(catkin REQUIRED COMPONENTS
   message_runtime
   rospy
+  roscpp
   std_msgs
   message_generation
+)
+
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  ${PROJECT_SOURCE_DIR}/src
 )
 
 add_message_files(
@@ -22,5 +28,29 @@ generate_messages(
 )
 
 catkin_package(
-
+   CATKIN_DEPENDS roscpp std_msgs message_generation message_runtime
 )
+
+add_executable(galileo_status_relay
+  ${PROJECT_SOURCE_DIR}/src/galileo_status_relay.cpp
+)
+
+target_link_libraries(galileo_status_relay
+   ${catkin_LIBRARIES}
+)
+
+message("Init system_monitor config ...")
+execute_process(
+  COMMAND "${PROJECT_SOURCE_DIR}/script/init.sh"
+  OUTPUT_VARIABLE output
+  ERROR_VARIABLE error
+  RESULT_VARIABLE result
+)
+
+if("${result}" STREQUAL "0")
+  message("${output}")
+  message("Init system monitor config success")
+else()
+  message("${error}")
+  message(FATAL_ERROR "Init system monitor config failed")
+endif()

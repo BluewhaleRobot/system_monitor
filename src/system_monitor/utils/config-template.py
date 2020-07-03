@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -35,7 +35,7 @@ BROADCAST_PORT_V2 = 22002 # 局域网广播端口V2版本
 
 MAX_VEL = 0.8
 MAX_THETA = 1.5
-POWER_LOW = 9.8
+POWER_LOW = 33.5
 
 TF_ROT = np.array([[0., 0., 1.],
                    [-1., 0., 0.], [0., -1., 0.]])

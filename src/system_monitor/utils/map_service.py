@@ -49,6 +49,7 @@ class MapService(threading.Thread):
         self.update = update
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
         if self.scale_orb_thread != None:
@@ -69,9 +70,19 @@ class MapService(threading.Thread):
 
     def run(self):
         self._stop.clear()
+        # 多摄像头参数，0表示使用前摄像头建图，1表示使用后摄像头建图
+        camera_id = int(rospy.get_param("~camera_id", -1))
         cmd = "roslaunch ORB_SLAM2 map.launch"
+        if camera_id == 0:
+            cmd = "roslaunch ORB_SLAM2 map_front.launch"
+        if camera_id == 1:
+            cmd = "roslaunch ORB_SLAM2 map_back.launch"
+        if self.fake_flag:
+            cmd = "roslaunch ORB_SLAM2 map_fake.launch"
         if self.update:
             cmd = "roslaunch nav_test update_map.launch"
+            if self.fake_flag:
+                cmd = "roslaunch nav_test update_map_fake.launch"
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
         while not self.stopped() and not rospy.is_shutdown():

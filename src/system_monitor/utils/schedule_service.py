@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # encoding=utf-8
 # The MIT License (MIT)
 #
@@ -33,13 +33,12 @@ import time
 import psutil
 import rospy
 
-from .config import ROS_PACKAGE_PATH
+from config import ROS_PACKAGE_PATH
 
 
-class NavigationService(threading.Thread):
-    # orb_slam建图线程
+class ScheduleService(threading.Thread):
     def __init__(self, galileo_status, galileo_status_lock):
-        super(NavigationService, self).__init__()
+        super(ScheduleService, self).__init__()
         self._stop = threading.Event()
         self._stop.set()
         self.p = None
@@ -47,6 +46,7 @@ class NavigationService(threading.Thread):
         self.speed = 1
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
         if self.p != None:
@@ -70,13 +70,15 @@ class NavigationService(threading.Thread):
     def run(self):
         self._stop.clear()
         if self.speed == 1:
-            cmd = "roslaunch nav_test tank_blank_map1.launch"
+            cmd = "roslaunch lagrange_navigation navigation.launch"
         elif self.speed == 2:
-            cmd = "roslaunch nav_test tank_blank_map2.launch"
+            cmd = "roslaunch lagrange_navigation navigation.launch"
         elif self.speed == 3:
-            cmd = "roslaunch nav_test tank_blank_map3.launch"
+            cmd = "roslaunch lagrange_navigation navigation.launch"
         elif self.speed == 0:
-            cmd = "roslaunch nav_test tank_blank_map0.launch"
+            cmd = "roslaunch lagrange_navigation navigation.launch"
+        if self.fake_flag:
+            cmd = "roslaunch lagrange_navigation fake.launch"
 
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
