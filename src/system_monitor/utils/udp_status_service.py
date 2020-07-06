@@ -93,7 +93,7 @@ class UDPStatusService(threading.Thread):
             self.robot_pose_stamped.pose = odom.pose.pose  # 更新坐标
             self.robot_pose_stamped.header = odom.header  # 更新坐标
 
-        self.odom_sub = rospy.Subscriber("/bWmono/Odom", Odometry, update_odom)
+        self.odom_sub = rospy.Subscriber("/slam_node/Odom", Odometry, update_odom)
 
     def stop(self):
         self.odom_sub.unregister()
