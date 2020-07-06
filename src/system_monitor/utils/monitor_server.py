@@ -52,7 +52,7 @@ from .navigation_service import NavigationService
 from .schedule_service import ScheduleService
 from .req_parser import ReqParser
 from .utils import stop_process
-from system_monitor.cfg import system_monitorConfigfrom system_monitor.cfg import system_monitorConfig
+from system_monitor.cfg import system_monitorConfig
 
 
 class MonitorServer(threading.Thread):
@@ -105,7 +105,9 @@ class MonitorServer(threading.Thread):
         rospy.loginfo("service started")
 
         def get_galileo_cmds(cmds):
-            self.parse_data([map(lambda x: ord(x), list(cmds.data))])
+            rospy.logwarn("received commads")
+            rospy.logwarn(list(cmds.data))
+            self.parse_data([list(cmds.data)])
 
         self.cmd_sub = rospy.Subscriber('/galileo/cmds', GalileoNativeCmds, get_galileo_cmds)
 
@@ -126,7 +128,7 @@ class MonitorServer(threading.Thread):
             try:
                 data, self.user_socket_remote = self.user_server_socket.recvfrom(
                     self.buf_size)
-            except timeout:
+            except Exception:
                 continue
             if not data:
                 break

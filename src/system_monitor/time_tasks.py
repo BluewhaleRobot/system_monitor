@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #encoding=utf-8
 
 import rospy
@@ -82,7 +82,7 @@ def status_update_cb(status):
             else:
                 POWER_RECORDS.pop(0)
                 POWER_RECORDS.append(status.power)
-            POWER_NOW = sum(POWER_RECORDS) / len(POWER_RECORDS);
+            POWER_NOW = sum(POWER_RECORDS) / len(POWER_RECORDS)
         CHARGE_FLAG = status.chargeStatus
 
 def change_map(map_name, path_name):
@@ -220,7 +220,7 @@ class MapSwitchTask():
             rospy.set_param("/system_monitor/nav_is_enabled", False)
             AUDIO_PUB.publish("地图切换成功, 开始重新载入导航任务")
             galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'm' + chr(0x04)
+            galileo_cmds.data = b'm' + int.to_bytes(0x04, 1,  byteorder='big')
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
@@ -232,13 +232,13 @@ class MapSwitchTask():
                 nav_status = NAV_STATUS
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >20:
                     break
             #再重新开启
             rospy.set_param("/system_monitor/nav_is_enabled", True)
             nav_status = 0
-            galileo_cmds.data = 'm' + chr(0x00)
+            galileo_cmds.data = b'm' + int.to_bytes(0x00, 1,  byteorder='big')
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
@@ -250,7 +250,7 @@ class MapSwitchTask():
                 nav_status = NAV_STATUS
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >10:
                     break
             STATUS_LOCK.acquire()
@@ -406,7 +406,7 @@ class AutoRunTask():
                 if self.looptask_state == "CANCELLED" and nav_status == 1 and charge_flag_now ==2 and not self.looptaskflag:
                     #停止充电
                     galileo_cmds = GalileoNativeCmds()
-                    galileo_cmds.data = 'j' + chr(0x01)
+                    galileo_cmds.data = b'j' + int.to_bytes(0x01, 1,  byteorder='big')
                     galileo_cmds.length = len(galileo_cmds.data)
                     galileo_cmds.header.stamp = rospy.Time.now()
                     GALILEO_PUB.publish(galileo_cmds)
@@ -481,7 +481,7 @@ class AutoRunTask():
         #停止导航
         rospy.set_param("/system_monitor/nav_is_enabled", False)
         galileo_cmds = GalileoNativeCmds()
-        galileo_cmds.data = 'm' + chr(0x04)
+        galileo_cmds.data = b'm' + int.to_bytes(0x04, 1,  byteorder='big')
         galileo_cmds.length = len(galileo_cmds.data)
         galileo_cmds.header.stamp = rospy.Time.now()
         max_do = 0
@@ -523,7 +523,7 @@ class AutoRunTask():
             if power_now_value > POWER_LOW:
                 #停止充电
                 galileo_cmds = GalileoNativeCmds()
-                galileo_cmds.data = 'j' + chr(0x01)
+                galileo_cmds.data = b'j' + int.to_bytes(0x01, 1,  byteorder='big')
                 galileo_cmds.length = len(galileo_cmds.data)
                 galileo_cmds.header.stamp = rospy.Time.now()
                 GALILEO_PUB.publish(galileo_cmds)
@@ -536,7 +536,7 @@ class AutoRunTask():
         while charge_flag_now == 2 and self.ifneed_runnow() and not rospy.is_shutdown():
             #停止充电
             galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'j' + chr(0x01)
+            galileo_cmds.data = b'j' + bint.to_bytes(0x01, 1,  byteorder='big')
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
             GALILEO_PUB.publish(galileo_cmds)
@@ -572,7 +572,7 @@ class AutoRunTask():
             rospy.set_param("/system_monitor/nav_is_enabled", False)
             AUDIO_PUB.publish("地图切换成功, 开始重新载入导航任务")
             galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'm' + chr(0x04)
+            galileo_cmds.data = b'm' + int.to_bytes(0x04, 1,  byteorder='big')
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
@@ -589,14 +589,14 @@ class AutoRunTask():
                 task_needstop_now = TASK_NEEDSTOP
                 nav_status = NAV_STATUS
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >20:
                     break
             #再重新开启
             rospy.set_param("/system_monitor/nav_is_enabled", True)
             #第二步开始循环任务
             nav_status = 0
-            galileo_cmds.data = 'm' + chr(0x00)
+            galileo_cmds.data = b'm' + int.to_bytes(0x00, 1,  byteorder='big')
             galileo_cmds.length = len(galileo_cmds.data)
             galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
