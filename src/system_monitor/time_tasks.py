@@ -731,7 +731,7 @@ if __name__ == "__main__":
         #任务最多每分钟执行一次
         schedule.run_pending()
         #每10分钟检查一下任务是否要重新载入
-        if index_i >=3:
+        if index_i >= 3 * 60:
             index_i = 0
             filechange_handler.if_changed()
             FILESTATUS_LOCK.acquire()
@@ -741,4 +741,4 @@ if __name__ == "__main__":
             FILESTATUS_LOCK.release()
 
         index_i = index_i +1
-        time.sleep(60)
+        time.sleep(1)
