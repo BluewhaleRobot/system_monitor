@@ -40,11 +40,10 @@ POWER_LOW = 33.5
 TF_ROT = np.array([[0., 0., 1.],
                    [-1., 0., 0.], [0., -1., 0.]])
 TF_TRANS = np.array([0.05, 0.0, 0.])
-ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
-    '/opt/ros/kinetic/stacks:' + \
+ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/noetic/share:' + \
+    '/opt/ros/noetic/stacks:' + \
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
 SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.log"
 IOT_SECRET = "Jbk3GLKIZYIRrTgthbAEa9TlXHdae5UL"
 IOT_KEY = "a1Eb29fVWHG"
 IOT_PASSWORD = "xiaoqiang"
-VERSION = "2.1.0"
