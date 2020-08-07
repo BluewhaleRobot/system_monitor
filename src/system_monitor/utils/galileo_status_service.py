@@ -35,6 +35,8 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int32, Float32
 from tf.transformations import euler_from_quaternion
 import tf
+import requests
+import json
 
 
 class GalileoStatusService(threading.Thread):
@@ -240,6 +242,23 @@ class GalileoStatusService(threading.Thread):
                 self.galileo_status.busyStatus = 0
                 if self.monitor_server.busy_flag:
                     self.galileo_status.busyStatus = 1
+
+                # 兼容http api状态，根据galieo api任务状态更新galileo status
+                try:
+                    res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
+                    if res.status_code == 200:
+                        # 正在执行 nav action
+                        nav_task_info = json.loads(res.content.decode("utf-8"))
+                        self.galileo_status.targetNumID = -2
+                        if nav_task_info["state"] == "WORKING":
+                            self.galileo_status.targetStatus = 1
+                            self.galileo_status.angleGoalStatus = 0
+                        if nav_task_info["state"] == "PAUSED":
+                            self.galileo_status.targetStatus = 2
+                            self.galileo_status.angleGoalStatus = 2
+                        self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
+                except Exception:
+                    pass
 
                 # reset old status
                 now = int(time.time() * 1000)
