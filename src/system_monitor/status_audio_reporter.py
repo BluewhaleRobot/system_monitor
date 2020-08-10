@@ -110,6 +110,11 @@ if __name__ == "__main__":
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
 
+            #开启建图时需要打开雷达，因为机器人开启运动要几秒
+            if PREVISOUS_STATUS.mapStatus == 0 and status.mapStatus == 1:
+                if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+                    rospy.set_param("/rplidar_node_manager/keep_running", True)
+
             PREVIOUS_GREETING_FLAG = rospy.get_param(
                 "/xiaoqiang_greeting_node/is_enabled", False)
             PREVISOUS_STATUS = status
