@@ -423,7 +423,7 @@ class AutoRunTask():
                             self.looptask_state = "WAITTING"
                             self.looptask_active = True
                             AUDIO_PUB.publish("继续循环")
-            AUDIO_PUB.publish("结束循环")
+            AUDIO_PUB.publish("结束循环,开始返航")
         except Exception as e:
             print(e)
             return
