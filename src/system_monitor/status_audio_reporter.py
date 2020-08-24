@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 5000:
                 BLOCK_TIME_COUNT = -10000
-                audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
+                audio_pub.publish("您好，请让一下。机器人努力工作中。")
             # 5min不动则关闭雷达
             if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
@@ -104,9 +104,13 @@ if __name__ == "__main__":
                         cmd = "rosservice call /start_motor"
                         subprocess.Popen(
                             cmd, shell=True, env=new_env)
-                            
+
             #第一次开启服务时需要打开雷达，因为机器人开启运动要几秒，提高安全
             if PREVISOUS_STATUS.navStatus == 0 and status.navStatus == 1:
+                if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+                    rospy.set_param("/rplidar_node_manager/keep_running", True)
+
+            if PREVISOUS_STATUS.mapStatus == 0 and status.mapStatus == 1:
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
 

@@ -38,7 +38,7 @@ GALILEO_PUB = None
 
 TASK_LIST = list()
 
-POWER_LOW = 37
+POWER_LOW = 47
 
 POWER_NOW = 0
 
