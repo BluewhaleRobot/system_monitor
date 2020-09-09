@@ -40,7 +40,7 @@ import rosservice
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from geometry_msgs.msg import Pose, Pose2D, PoseStamped, Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int16, String, UInt32
+from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
 from system_monitor.msg import Status
 
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
@@ -324,9 +324,6 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
                         os.system("pkill -f 'roslaunch lagrange_navigation navigation.launch'")
                     if cmds[count][1] == 5:
-                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
-                            continue
-
                         if not rospy.get_param("/system_monitor/nav_is_enabled", True):
                             continue
                         rospy.loginfo("开启自动巡检")
