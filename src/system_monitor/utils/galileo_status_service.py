@@ -256,6 +256,8 @@ class GalileoStatusService(threading.Thread):
                         if nav_task_info["state"] == "PAUSED":
                             self.galileo_status.targetStatus = 2
                             self.galileo_status.angleGoalStatus = 2
+                        if "index" in nav_task_info and nav_task_info["index"] != -1:
+                            self.galileo_status.targetNumID = nav_task_info["index"]
                         self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
                 except Exception:
                     pass
