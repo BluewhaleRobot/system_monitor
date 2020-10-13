@@ -38,9 +38,10 @@ import rospy
 import tf
 import rosservice
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
+from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 from geometry_msgs.msg import Pose, Pose2D, PoseStamped, Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
+from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from system_monitor.msg import Status
 
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
@@ -151,6 +152,16 @@ class MonitorServer(threading.Thread):
                 if cmds[count][0] == 0xaa and cmds[count][1] == 0x44:
                     rospy.loginfo("system poweroff")
                     self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
+                    
+                    if rosservice.get_service_node("/motor_driver/shutdown") is not None:
+                        # call shutdown service
+                        rospy.wait_for_service('/motor_driver/shutdown')
+                        shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
+                        req = ShutdownRequest()
+                        req.flag = True
+                        rospy.logwarn("Call shutdown service")
+                        res = shutdown_rpc(req)
+                        rospy.logwarn(res)
                     # 等待语音播放完毕
                     time.sleep(5)
                     rospy.loginfo("system poweroff2")
