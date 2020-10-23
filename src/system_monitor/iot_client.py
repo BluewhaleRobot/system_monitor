@@ -150,7 +150,11 @@ class IotClient():
         if self.fast_update_flag:
             self.skip_count = 30 # 1s 更新一次
         rospy.logwarn("############# update iot status")
-        self.publish_status(galileo_status_to_json(status))
+        try:
+            self.publish_status(galileo_status_to_json(status))
+        except Exception as e:
+            rospy.logwarn("update status failed")
+            pass
     
     def set_on_test(self, cb):
         self.on_test = cb
@@ -161,9 +165,21 @@ class IotClient():
     def set_on_speed(self, cb):
         self.on_speed = cb
 
+def check_network_connection():
+    try:
+        res = requests.get("https://baidu.com", timeout=1)
+        return True
+    except Exception:
+        return False
+
 
 if __name__ == "__main__":
     rospy.init_node("iot_client")
+    # 等待联网
+    time.sleep(20)
+    while not check_network_connection():
+        rospy.logwarn("wait network")
+        time.sleep(5)
     client = IotClient(get_my_id())
     galileo_cmd_pub = rospy.Publisher("/galileo/cmds", GalileoNativeCmds, queue_size=1)
     test_pub = rospy.Publisher("/pub_test", String, queue_size=1)
