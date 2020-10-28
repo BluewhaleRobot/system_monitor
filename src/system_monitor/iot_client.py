@@ -52,7 +52,9 @@ class IotClient():
         self.on_audio = None
         self.on_speed = None
         self.secret = IOT_SECRET
+        self.fast_update_flag = False
         self.skip_count = 30
+        self.last_cmd_timestamp = 0
         self.lk = linkkit.LinkKit(
             host_name="cn-shanghai",
             product_key=IOT_KEY,
@@ -97,14 +99,18 @@ class IotClient():
 
         def on_topic_message(topic, payload, qos, userdata):
             if topic == self.lk.to_full_topic("user/galileo/cmds") and self.on_galileo_cmds is not None:
+                self.last_cmd_timestamp = int(time.time() * 1000)
                 self.on_galileo_cmds(payload)
             if topic == self.lk.to_full_topic("user/galileo/status") and self.on_status_update is not None:
                 self.on_status_update(payload)
             if topic == self.lk.to_full_topic("user/test") and self.on_test is not None:
+                self.last_cmd_timestamp = int(time.time() * 1000)
                 self.on_test(payload)
             if topic == self.lk.to_full_topic("user/audio") and self.on_audio is not None:
+                self.last_cmd_timestamp = int(time.time() * 1000)
                 self.on_audio(payload)
             if topic == self.lk.to_full_topic("user/speed") and self.on_speed is not None:
+                self.last_cmd_timestamp = int(time.time() * 1000)
                 self.on_speed(payload)
         
         def on_rrpc_msg(rrpc_id, topic, payload, qos, userdata):
@@ -135,11 +141,20 @@ class IotClient():
         self.on_status_update = cb
 
     def status_received(self, status):
+        if self.fast_update_flag and self.skip_count > 30:
+            self.skip_count = 30
         if self.skip_count >= 0:
             self.skip_count -= 1
             return
-        self.skip_count = 30
-        self.publish_status(galileo_status_to_json(status))
+        self.skip_count = 30 * 60 # 默认1min上传一次
+        if self.fast_update_flag:
+            self.skip_count = 30 # 1s 更新一次
+        rospy.logwarn("############# update iot status")
+        try:
+            self.publish_status(galileo_status_to_json(status))
+        except Exception as e:
+            rospy.logwarn("update status failed")
+            pass
     
     def set_on_test(self, cb):
         self.on_test = cb
@@ -150,9 +165,21 @@ class IotClient():
     def set_on_speed(self, cb):
         self.on_speed = cb
 
+def check_network_connection():
+    try:
+        res = requests.get("https://baidu.com", timeout=1)
+        return True
+    except Exception:
+        return False
+
 
 if __name__ == "__main__":
     rospy.init_node("iot_client")
+    # 等待联网
+    time.sleep(20)
+    while not check_network_connection():
+        rospy.logwarn("wait network")
+        time.sleep(5)
     client = IotClient(get_my_id())
     galileo_cmd_pub = rospy.Publisher("/galileo/cmds", GalileoNativeCmds, queue_size=1)
     test_pub = rospy.Publisher("/pub_test", String, queue_size=1)
@@ -187,3 +214,8 @@ if __name__ == "__main__":
     rospy.Subscriber("/galileo/status", GalileoStatus, client.status_received)
     while not rospy.is_shutdown():
         time.sleep(1)
+        current_time = int(time.time() * 1000)
+        if current_time - client.last_cmd_timestamp > 2 * 60 * 1000: # 2min内没有收到新的指令，进入慢速状态上传模式
+            client.fast_update_flag = False
+        else:
+            client.fast_update_flag = True
