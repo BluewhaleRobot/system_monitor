@@ -19,9 +19,16 @@
 import os
 import logging
 import threading
-import Queue as queue
-import urllib
-import urllib2
+import sys
+if sys.version > "3":
+    import queue
+    import urllib.request as urllib2
+    import urllib.parse as urllib
+else:
+    import Queue as queue
+    import urllib2
+    import urllib
+
 import json
 import hashlib
 import hmac
@@ -846,7 +853,6 @@ HMUfpIBvFSDJ3gyICh3WZlXi/EjJKSZp4A==\n\
             "signMethod": "hmacsha256"
         }
         data = urllib.urlencode(post_data)
-        print(data)
         data = data.encode('ascii')
         request_url = "https://iot-auth.%s.aliyuncs.com/auth/register/device" % self.__host_name
         with urllib2.urlopen(request_url, data, context=context) as f:
