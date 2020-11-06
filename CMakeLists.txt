@@ -45,6 +45,8 @@ target_link_libraries(galileo_status_relay
    ${catkin_LIBRARIES}
 )
 
+add_dependencies(galileo_status_relay ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 message("Init system_monitor config ...")
 execute_process(
   COMMAND "${PROJECT_SOURCE_DIR}/script/init.sh"
