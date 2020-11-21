@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 5000:
                 BLOCK_TIME_COUNT = -10000
-                audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
+                audio_pub.publish("请让开一下，谢谢，机器人努力工作中！")
             # 5min不动则关闭雷达
             if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
