@@ -14,6 +14,7 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from galileo_serial_server.msg import GalileoStatus, GalileoNativeCmds
 import logging
+import threading
 logging.basicConfig()
 
 
@@ -104,21 +105,21 @@ class IotClient():
             rospy.logwarn("on_topic_message: " + topic)
             if topic == self.lk.to_full_topic("user/galileo/cmds") and self.on_galileo_cmds is not None:
                 self.last_cmd_timestamp = int(time.time() * 1000)
-                self.on_galileo_cmds(payload)
+                threading.Thread(target=self.on_galileo_cmds, args=(payload,))
             if topic == self.lk.to_full_topic("user/galileo/status") and self.on_status_update is not None:
-                self.on_status_update(payload)
+                threading.Thread(target=self.on_status_update, args=(payload,))
             if topic == self.lk.to_full_topic("user/test") and self.on_test is not None:
                 self.last_cmd_timestamp = int(time.time() * 1000)
-                self.on_test(payload)
+                threading.Thread(target=self.on_test, args=(payload,))
             if topic == self.lk.to_full_topic("user/audio") and self.on_audio is not None:
                 self.last_cmd_timestamp = int(time.time() * 1000)
-                self.on_audio(payload)
+                threading.Thread(target=self.on_audio, args=(payload,))
             if topic == self.lk.to_full_topic("user/speed") and self.on_speed is not None:
                 self.last_cmd_timestamp = int(time.time() * 1000)
-                self.on_speed(payload)
+                threading.Thread(target=self.on_speed, args=(payload,))
             if topic == self.lk.to_full_topic("user/galileo_api_bridge/request") and self.on_request is not None:
                 self.last_cmd_timestamp = int(time.time() * 1000)
-                self.on_request(payload)
+                threading.Thread(target=self.on_request, args=(payload,))
 
         
         def on_rrpc_msg(rrpc_id, topic, payload, qos, userdata):
