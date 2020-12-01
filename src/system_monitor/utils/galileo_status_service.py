@@ -37,6 +37,7 @@ from tf.transformations import euler_from_quaternion
 import tf
 import requests
 import json
+from config import POWER_LOW
 
 
 class GalileoStatusService(threading.Thread):
@@ -98,7 +99,7 @@ class GalileoStatusService(threading.Thread):
             self.charge_status = status.data
 
         def update_power(power):
-            if power.data == 0:
+            if power.data < POWER_LOW / 2:
                 return
             self.power_time = int(time.time() * 1000)
             self.power = power.data
