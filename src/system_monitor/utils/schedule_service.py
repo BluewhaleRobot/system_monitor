@@ -34,6 +34,8 @@ import psutil
 import rospy
 
 from .config import ROS_PACKAGE_PATH
+from ORB_SLAM2.msg import LoadMapAction, LoadMapActionGoal
+from actionlib.simple_action_client import SimpleActionClient
 
 
 class ScheduleService(threading.Thread):
@@ -98,6 +100,13 @@ class ScheduleService(threading.Thread):
             if self.p_slam == None and not self.stopped():
                 self.p_slam = subprocess.Popen(self.slam_cmd, shell=True, env=new_env)
                 self.ps_process_slam = psutil.Process(pid=self.p_slam.pid)
+                # 载入地图
+                client = SimpleActionClient("/ORB_SLAM2/map_load", LoadMapAction)
+                client.wait_for_server()
+                goal = LoadMapActionGoal()
+                goal.goal.map_name = rospy.get_param("/galileo/galileo_map", "default")
+                client.send_goal(goal.goal)
+                client.wait_for_result()
             else:
                 if not self.ps_process_slam.is_running():
                     break
