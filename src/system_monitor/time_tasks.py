@@ -139,7 +139,7 @@ def change_map(map_name, path_name):
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
 
-    res = subprocess.Popen("cp -rf {map_workspace}/path_{path_name}.csv {map_workspace}/path_{path_name}.csv.active".format(path_name=path_name, map_workspace=CURRENT_DB_PATH),
+    res = subprocess.Popen("cp -rf {map_workspace}/path_{path_name}.csv {map_workspace}/path_{path_name}.csv.active".format(path_name=path_name.encode(encoding='utf-8'), map_workspace=CURRENT_DB_PATH),
         universal_newlines=True,
         shell=True,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
