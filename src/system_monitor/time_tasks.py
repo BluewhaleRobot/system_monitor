@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #encoding=utf-8
-
+import subprocess
 import rospy
 import actionlib
 from actionlib_msgs.msg import *
@@ -130,6 +130,20 @@ def change_map(map_name, path_name):
         shutil.copy(new_nav_src, new_nav_dst)
     if os.path.exists(path_src):
         shutil.copy(path_src, path_dst)
+    
+    # 设置.active文件
+    # 删除所有.active文件
+    res1 = subprocess.Popen("rm -rf {map_workspace}/*.active".format(map_workspace=CURRENT_DB_PATH),
+        universal_newlines=True,
+        shell=True,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+
+    res = subprocess.Popen("cp -rf {map_workspace}/path_{path_name}.csv {map_workspace}/path_{path_name}.csv.active".format(path_name=path_name.encode(encoding='utf-8'), map_workspace=CURRENT_DB_PATH),
+        universal_newlines=True,
+        shell=True,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
 
     rospy.set_param("/system_monitor/nav_is_enabled", True)
     return True
