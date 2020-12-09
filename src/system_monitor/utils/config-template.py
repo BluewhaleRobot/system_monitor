@@ -35,11 +35,11 @@ BROADCAST_PORT_V2 = 22002 # 局域网广播端口V2版本
 
 MAX_VEL = 0.8
 MAX_THETA = 1.2
-POWER_LOW = 47
+POWER_LOW = 45
 
 TF_ROT = np.array([[0., 0., 1.],
                    [-1., 0., 0.], [0., -1., 0.]])
-TF_TRANS = np.array([0.5, 0.0, 0.])
+TF_TRANS = np.array([0.45, 0.0, 0.])
 ROS_PACKAGE_PATH = '/home/xiaoqiang/Documents/ros/src:/opt/ros/kinetic/share:' + \
     '/opt/ros/kinetic/stacks:' + \
     '/home/xiaoqiang/Documents/ros/src/ORB_SLAM2/Examples/ROS'
