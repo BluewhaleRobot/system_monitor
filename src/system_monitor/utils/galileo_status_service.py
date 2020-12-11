@@ -244,23 +244,24 @@ class GalileoStatusService(threading.Thread):
                     self.galileo_status.busyStatus = 1
 
                 # 兼容http api状态，根据galieo api任务状态更新galileo status
-                try:
-                    res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
-                    if res.status_code == 200:
-                        # 正在执行 nav action
-                        nav_task_info = json.loads(res.content.decode("utf-8"))
-                        self.galileo_status.targetNumID = -2
-                        if nav_task_info["state"] == "WORKING":
-                            self.galileo_status.targetStatus = 1
-                            self.galileo_status.angleGoalStatus = 0
-                        if nav_task_info["state"] == "PAUSED":
-                            self.galileo_status.targetStatus = 2
-                            self.galileo_status.angleGoalStatus = 2
-                        if "index" in nav_task_info and nav_task_info["index"] != -1:
-                            self.galileo_status.targetNumID = nav_task_info["index"]
-                        self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
-                except Exception:
-                    pass
+                if self.galileo_status.navStatus == 1:
+                    try:
+                        res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
+                        if res.status_code == 200:
+                            # 正在执行 nav action
+                            nav_task_info = json.loads(res.content.decode("utf-8"))
+                            self.galileo_status.targetNumID = -2
+                            if nav_task_info["state"] == "WORKING":
+                                self.galileo_status.targetStatus = 1
+                                self.galileo_status.angleGoalStatus = 0
+                            if nav_task_info["state"] == "PAUSED":
+                                self.galileo_status.targetStatus = 2
+                                self.galileo_status.angleGoalStatus = 2
+                            if "index" in nav_task_info and nav_task_info["index"] != -1:
+                                self.galileo_status.targetNumID = nav_task_info["index"]
+                            self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
+                    except Exception:
+                        pass
 
                 # reset old status
                 now = int(time.time() * 1000)
