@@ -259,7 +259,13 @@ class GalileoStatusService(threading.Thread):
                                 self.galileo_status.angleGoalStatus = 2
                             if "index" in nav_task_info and nav_task_info["index"] != -1:
                                 self.galileo_status.targetNumID = nav_task_info["index"]
-                            self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
+                            self.galileo_status.targetDistance = nav_task_info["current_distance"]
+                        # 获取当前的loop task
+                        res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
+                        if res.status_code == 200:
+                            self.galileo_status.loopStatus = 1
+                        else:
+                            self.galileo_status.loopStatus = 0
                     except Exception:
                         pass
 

@@ -414,8 +414,8 @@ class NavigationTask():
             theta_delta = math.atan2(
                 point.position.y - current_pose.position.y, point.position.x - current_pose.position.x)
             delta_current = abs(theta_delta - theta_current)
-            if delta_current > 3.1415926:
-                delta_current = abs(2 * 3.1415926 - delta_current)
+            if delta_current > math.pi:
+                delta_current = abs(2 * math.pi - delta_current)
 
             rospy.loginfo("delta_current: " + str(delta_current))
             rospy.loginfo("current pose: " + str(current_pose.position.x) +
