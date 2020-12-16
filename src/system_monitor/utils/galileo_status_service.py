@@ -259,7 +259,7 @@ class GalileoStatusService(threading.Thread):
                             self.galileo_status.angleGoalStatus = 2
                         if "index" in nav_task_info and nav_task_info["index"] != -1:
                             self.galileo_status.targetNumID = nav_task_info["index"]
-                        self.galileo_status.targetDistance = nav_task_info["sub_tasks"]["current_distance"]
+                        self.galileo_status.targetDistance = nav_task_info["current_distance"]
                 except Exception:
                     pass
 
