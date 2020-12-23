@@ -39,7 +39,7 @@ from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from geometry_msgs.msg import Pose, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Bool, Float64, Int16, Int32, UInt32
+from std_msgs.msg import Bool, Float64, Int16, Int32, UInt32, String
 from system_monitor.msg import Status
 from tf.transformations import euler_from_quaternion
 
@@ -67,7 +67,7 @@ def get_scan(scan):
     rplidar_flag = True
 
 def init_sub_pubs():
-    rospy.init_node("remote_server", anonymous=True)
+    rospy.init_node("remote_server")
     rospy.Subscriber("/global_move_flag", Bool, get_global_move_flag)
     rospy.Subscriber('/scan', LaserScan, get_scan)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
@@ -80,7 +80,9 @@ def init_sub_pubs():
     CHARGE_POSE_PUB = rospy.Publisher(
         '/bw_auto_dock/dockposition_save', Bool, queue_size=0)
     GALILEO_STATUS_PUB = rospy.Publisher(
-        '/galileo/status', GalileoStatus, queue_size=0)
+        '~galileo/status', GalileoStatus, queue_size=0)
+    AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
+    POWEROFF_PUB = rospy.Publisher('/xqserial_server/poweroff', Bool, queue_size=1)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
@@ -90,6 +92,8 @@ def init_sub_pubs():
         "GALILEO_STATUS_PUB": GALILEO_STATUS_PUB,
         "CHARGE_PUB": CHARGE_PUB,
         "CHARGE_POSE_PUB": CHARGE_POSE_PUB,
+        "AUDIO_PUB": AUDIO_PUB,
+        "POWEROFF_PUB": POWEROFF_PUB,
     }
 
 
