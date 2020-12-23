@@ -66,6 +66,9 @@ WORKING_FLAG = False
 time2_diff_value = 0.0
 
 ORB_INIT_FLAG2 = False
+
+CHARGE_FLAG = False
+
 class TrackTask(threading.Thread):
 
     def __init__(self):
@@ -136,7 +139,7 @@ def do_security():
     global CAMERA_CURRENT_TIME, CAR_CURRENT_TIME
     global GLOBAL_MOVE_PUB, VEL_PUB
     global NAV_FLAG_PUB, ENABLE_MOVE_FLAG, BAR_FLAG
-    global time2_diff_value,ORB_INIT_FLAG2
+    global time2_diff_value,ORB_INIT_FLAG2,CHARGE_FLAG
 
     time_now = rospy.Time.now()
 
@@ -156,8 +159,13 @@ def do_security():
     else:
         time2_diff_value = 0.0
 
+    if CHARGE_FLAG:
+        time2_diff_value =0.0
+
+    CHARGE_FLAG = False
     CAMERA_UPDATE_FLAG = False
     CAR_UPDATE_FLAG = False
+
     # 视觉丢失超时保险
     # 里程计丢失超时保险
     if ORB_INIT_FLAG2 and ( time2_diff_value > 120 or time1_diff.to_sec() > 120.) and not BAR_FLAG and WORKING_FLAG:
@@ -175,15 +183,15 @@ def do_security():
     STATUS_LOCK.release()
 
 
-def deal_car_status(car_status):
-    global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
-    with STATUS_LOCK:
-        status = car_status.data
-        if status == 2:
-            BAR_FLAG = True
-            CAMERA_CURRENT_TIME = rospy.Time.now()
-        else:
-            BAR_FLAG = False
+# def deal_car_status(car_status):
+#     global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
+#     with STATUS_LOCK:
+#         status = car_status.data
+#         if status == 2:
+#             BAR_FLAG = True
+#             CAMERA_CURRENT_TIME = rospy.Time.now()
+#         else:
+#             BAR_FLAG = False
 
 def deal_car_status(car_twist_msg):
     global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
@@ -200,7 +208,7 @@ def deal_car_status(car_twist_msg):
 
 
 def deal_galileo_status(galileo_msg):
-    global WORKING_FLAG, STATUS_LOCK,CAR_CURRENT_TIME,CAMERA_CURRENT_TIME
+    global WORKING_FLAG, STATUS_LOCK,CAR_CURRENT_TIME,CAMERA_CURRENT_TIME,CHARGE_FLAG
     with STATUS_LOCK:
 
         if galileo_msg.targetStatus == 1:
@@ -209,6 +217,11 @@ def deal_galileo_status(galileo_msg):
             WORKING_FLAG = False
             CAR_CURRENT_TIME = rospy.Time.now()
             CAMERA_CURRENT_TIME = rospy.Time.now()
+
+        if galileo_msg.chargeStatus == 0:
+            CHARGE_FLAG = False
+        else:
+            CHARGE_FLAG = True
 
 def init():
     global ORB_INIT_FLAG, ORB_START_FLAG

@@ -32,17 +32,21 @@ System status will be published at /system_monitor/report
 
 import json
 import threading
+import time
+import commands
 
 import rospy
+import rosservice
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, UInt32, Int32
+from std_msgs.msg import Bool, Float64, UInt32, Int32, String
 from system_monitor.msg import Status
 from xiaoqiang_log.msg import LogRecord
 
 from utils.config import POWER_LOW
 
 REPORT_PUB = ""
+AUDIO_PUB = ""
 ROBOT_STATUS = Status()
 ROBOT_STATUS.brightness = 0
 ROBOT_STATUS.imageStatus = False
@@ -71,7 +75,7 @@ def get_image(image):
 
 
 def get_power(power):
-    global POWER_LAST
+    global POWER_LAST, AUDIO_PUB
 
     with STATUS_LOCK:
         if ROBOT_STATUS.power < 0.1:
@@ -79,7 +83,6 @@ def get_power(power):
         if POWER_LAST < power.data + 0.7 and POWER_LAST > power.data - 0.7:
             ROBOT_STATUS.power = power.data
         POWER_LAST = power.data
-
 
 def get_odom(odom):
     with STATUS_LOCK:
@@ -111,7 +114,7 @@ def get_orb_scale_status(flag):
 
 
 def monitor():
-    global REPORT_PUB
+    global REPORT_PUB,AUDIO_PUB
     rospy.init_node("monitor", anonymous=True)
     rospy.Subscriber("/usb_cam/brightness", UInt32, get_brightness)
     rospy.Subscriber("/usb_cam/camera_info", rospy.AnyMsg, get_image)
@@ -122,6 +125,7 @@ def monitor():
     rospy.Subscriber("/orb_scale/scaleStatus", Bool, get_orb_scale_status)
     REPORT_PUB = rospy.Publisher(
         '/system_monitor/report', Status, queue_size=0)
+    AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
 
 
 if __name__ == "__main__":
