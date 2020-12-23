@@ -43,7 +43,12 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
 from system_monitor.msg import Status
 
-from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH, ALLOW_LOCAL_ONLY
+from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
+try:
+    from config import ALLOW_LOCAL_ONLY
+except ImportError:
+    ALLOW_LOCAL_ONLY = False
+
 from map_service import MapService
 from nav_task import NavigationTask
 from schedule_nav_task import ScheduleNavTask
