@@ -38,16 +38,22 @@ import rospy
 import tf
 import rosservice
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
-from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 from geometry_msgs.msg import Pose, Pose2D, PoseStamped, Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int16, String, UInt32
+from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
 from system_monitor.msg import Status
 
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
+try:
+    from config import ALLOW_LOCAL_ONLY
+except ImportError:
+    ALLOW_LOCAL_ONLY = False
+
 from map_service import MapService
 from nav_task import NavigationTask
+from schedule_nav_task import ScheduleNavTask
 from navigation_service import NavigationService
+from schedule_service import ScheduleService
 from req_parser import ReqParser
 from utils import stop_process
 
@@ -58,6 +64,8 @@ class MonitorServer(threading.Thread):
                  host='', user_socket_port=20001, buf_size=1024):
         super(MonitorServer, self).__init__()
         self.host = host
+        if ALLOW_LOCAL_ONLY:
+            self.host = "127.0.0.1"
         self.usersocket_port = user_socket_port
         self.buf_size = buf_size
         self._stop = threading.Event()
@@ -152,15 +160,6 @@ class MonitorServer(threading.Thread):
                     self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
                     # 等待语音播放完毕
                     time.sleep(5)
-                    if rosservice.get_service_node("/motor_driver/shutdown") is not None:
-                        # call shutdown service
-                        rospy.wait_for_service('/motor_driver/shutdown')
-                        shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
-                        req = ShutdownRequest()
-                        req.flag = True
-                        rospy.logwarn("Call shutdown service")
-                        res = shutdown_rpc(req)
-                        rospy.logwarn(res)
                     rospy.loginfo("system poweroff2")
                     commands.getstatusoutput(
                         'sudo shutdown -h now')
@@ -272,12 +271,38 @@ class MonitorServer(threading.Thread):
                         tilt_degree.data = -19
                         self.tilt_pub.publish(tilt_degree)
                         if self.nav_thread.stopped():
+                            self.nav_thread = NavigationService(self.galileo_status, self.galileo_status_lock)
                             self.nav_thread.setspeed(0)
                             self.nav_thread.start()
                             if self.nav_task is not None:
                                 self.nav_task.shutdown()
                             self.nav_task = NavigationTask()
-                    if cmds[count][1] == 4:
+                    # 开启调度导航
+                    if cmds[count][1] == 7:
+                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
+                            continue
+                        if time1_diff.to_sec() < 5:
+                            continue
+                        rospy.loginfo("开启视觉，不巡检")
+                        rospy.loginfo("关闭视觉")
+                        if not self.map_thread.stopped():
+                            rospy.loginfo("关闭视觉2")
+                            self.map_thread.stop()
+                        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
+                        os.system("pkill -f 'roslaunch nav_test update_map.launch'")
+
+                        self.last_nav_time = time_now
+                        tilt_degree = Int16()
+                        tilt_degree.data = -19
+                        self.tilt_pub.publish(tilt_degree)
+                        if self.nav_thread.stopped():
+                            self.nav_thread = ScheduleService(self.galileo_status, self.galileo_status_lock)
+                            self.nav_thread.setspeed(0)
+                            self.nav_thread.start()
+                            if self.nav_task is not None:
+                                self.nav_task.shutdown()
+                            self.nav_task = ScheduleNavTask()
+                    if cmds[count][1] == 4 or cmds[count][1] == 8:
                         rospy.loginfo("关闭自主巡检")
 
                         rospy.loginfo("关闭视觉")
@@ -304,10 +329,8 @@ class MonitorServer(threading.Thread):
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map1.launch'")
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map2.launch'")
                         os.system("pkill -f 'roslaunch nav_test tank_blank_map3.launch'")
+                        os.system("pkill -f 'roslaunch lagrange_navigation navigation.launch'")
                     if cmds[count][1] == 5:
-                        if not rospy.get_param("/system_monitor/nav_is_enabled", True):
-                            continue
-
                         if not rospy.get_param("/system_monitor/nav_is_enabled", True):
                             continue
                         rospy.loginfo("开启自动巡检")
