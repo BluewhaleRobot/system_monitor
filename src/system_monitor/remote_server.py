@@ -39,7 +39,7 @@ from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 from geometry_msgs.msg import Pose, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Bool, Float64, Int16, Int32, UInt32
+from std_msgs.msg import Bool, Float64, Int16, Int32, UInt32, String
 from system_monitor.msg import Status
 from tf.transformations import euler_from_quaternion
 
@@ -81,6 +81,8 @@ def init_sub_pubs():
         '/bw_auto_dock/dockposition_save', Bool, queue_size=0)
     GALILEO_STATUS_PUB = rospy.Publisher(
         '~galileo/status', GalileoStatus, queue_size=0)
+    AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=1)
+    POWEROFF_PUB = rospy.Publisher('/xqserial_server/poweroff', Bool, queue_size=1)
     return {
         "GLOBAL_MOVE_PUB": GLOBAL_MOVE_PUB,
         "ELEVATOR_PUB": ELEVATOR_PUB,
@@ -90,6 +92,8 @@ def init_sub_pubs():
         "GALILEO_STATUS_PUB": GALILEO_STATUS_PUB,
         "CHARGE_PUB": CHARGE_PUB,
         "CHARGE_POSE_PUB": CHARGE_POSE_PUB,
+        "AUDIO_PUB": AUDIO_PUB,
+        "POWEROFF_PUB": POWEROFF_PUB,
     }
 
 
