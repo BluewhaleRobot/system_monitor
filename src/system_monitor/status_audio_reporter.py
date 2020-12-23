@@ -19,6 +19,8 @@ BLOCK_TIME_COUNT = 0
 STOP_TIME_COUNT = 0
 PREVIOUS_GREETING_FLAG = False
 
+WORKING_TIME_COUNT = 0
+
 POWER_NOW = 0.0
 WARN_TIME_COUNT = 0
 POWER_TIME_COUNT = 0
@@ -40,7 +42,7 @@ if __name__ == "__main__":
 
 
     def status_update_cb(status):
-        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT
+        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT,WORKING_TIME_COUNT
         global MOVE_FLAG
         with STATUS_LOCK:
             if PREVISOUS_STATUS == None:
@@ -84,6 +86,15 @@ if __name__ == "__main__":
             if BLOCK_TIME_COUNT >= 5000:
                 BLOCK_TIME_COUNT = -10000
                 audio_pub.publish("您好，请让一下。机器人努力工作中。")
+
+            if status.targetStatus == 1 and (abs(status.currentSpeedX) > 0.01 or abs(status.currentSpeedTheta) > 0.01):
+                WORKING_TIME_COUNT += (1000 / 30)
+            else:
+                WORKING_TIME_COUNT = 0
+            if WORKING_TIME_COUNT >= 4000:
+                WORKING_TIME_COUNT = 0
+                audio_pub.publish("D")
+
             # 5min不动则关闭雷达
             if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
