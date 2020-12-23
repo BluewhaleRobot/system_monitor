@@ -195,6 +195,8 @@ class NavigationTask():
                         waypoint.pose.orientation = Quaternion(*q_angle)
             else:
                 angles = []
+                plan_mode = 0
+
                 with open(self.new_nav_points_file, "r") as new_nav_data_file:
                     new_nav_data_str = new_nav_data_file.readline()
                     self.target_points = []
@@ -206,6 +208,9 @@ class NavigationTask():
                         angles.append(angle)
                         self.target_points.append([pos_x, pos_y, pos_z])
                         new_nav_data_str = new_nav_data_file.readline()
+                        if len(new_nav_data_str.split(" ")) == 7:
+                            plan_mode = int(new_nav_data_str.split(" ")[6])
+                rospy.set_param("/NLlinepatrol_planner/ab_direction", plan_mode)
 
                 self.waypoints = list()
                 nav_index = 0
@@ -351,7 +356,7 @@ class NavigationTask():
         self.current_pose_stamped.header.frame_id = "odom"
         try:
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
@@ -366,7 +371,7 @@ class NavigationTask():
         try:
             self.current_pose_stamped.header.frame_id = "odom"
             self.current_pose_stamped_map = self.listener.transformPose(
-                "/map", self.current_pose_stamped)
+                "map", self.current_pose_stamped)
         except (tf.LookupException, tf.ConnectivityException,
                 tf.ExtrapolationException, tf.Exception):
             return -1
