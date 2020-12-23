@@ -32,9 +32,12 @@ import rospy
 from galileo_serial_server.msg import GalileoStatus
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool, Float64, Int32,Float32
+from std_msgs.msg import Bool, Float64, Int32, Float32
 from tf.transformations import euler_from_quaternion
 import tf
+import requests
+import json
+from config import POWER_LOW
 
 
 class GalileoStatusService(threading.Thread):
@@ -96,6 +99,8 @@ class GalileoStatusService(threading.Thread):
             self.charge_status = status.data
 
         def update_power(power):
+            if power.data < POWER_LOW / 2:
+                return
             self.power_time = int(time.time() * 1000)
             self.power = power.data
 
@@ -116,7 +121,10 @@ class GalileoStatusService(threading.Thread):
             "/ORB_SLAM/GBA", Bool, update_gba_status)
         self.charge_sub = rospy.Subscriber(
             "/bw_auto_dock/Chargestatus", Int32, update_charge_status)
-        self.power_sub = rospy.Subscriber(
+
+        # self.power_sub = rospy.Subscriber(
+        #     "/bw_auto_dock/Batterypower", Float32, update_power)
+        self.power_sub2 = rospy.Subscriber(
             "/xqserial_server/Power", Float64, update_power)
         self.current_speed_sub = rospy.Subscriber(
             "/cmd_vel", Twist, update_control_speed)
@@ -129,6 +137,7 @@ class GalileoStatusService(threading.Thread):
         self.gba_sub.unregister()
         self.charge_sub.unregister()
         self.power_sub.unregister()
+        self.power_sub2.unregister()
         self.current_speed_sub.unregister()
         self.control_speed_sub.unregister()
         self._stop.set()
@@ -234,6 +243,34 @@ class GalileoStatusService(threading.Thread):
                 self.galileo_status.busyStatus = 0
                 if self.monitor_server.busy_flag:
                     self.galileo_status.busyStatus = 1
+
+                # 兼容http api状态，根据galieo api任务状态更新galileo status
+                if self.galileo_status.navStatus == 1:
+                    try:
+                        res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
+                        if res.status_code == 200:
+                            nav_task_info = json.loads(res.content.decode("utf-8"))
+                            self.galileo_status.targetNumID = -2
+                            if nav_task_info["state"] == "WORKING":
+                                self.galileo_status.targetStatus = 1
+                                self.galileo_status.angleGoalStatus = 0
+                            if nav_task_info["state"] == "PAUSED":
+                                self.galileo_status.targetStatus = 2
+                                self.galileo_status.angleGoalStatus = 2
+                            if "index" in nav_task_info and nav_task_info["index"] != -1:
+                                self.galileo_status.targetNumID = nav_task_info["index"]
+                            self.galileo_status.targetDistance = nav_task_info["current_distance"]
+                        res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
+                        if res.status_code == 200:
+                            task_info = json.loads(res.content.decode("utf-8"))
+                            if task_info["state"] == "CANCELLED" or task_info["state"] == "ERROR" or task_info["state"] == "COMPLETE":
+                                self.galileo_status.loopStatus = 0    
+                            else:
+                                self.galileo_status.loopStatus = 1
+                        else:
+                            self.galileo_status.loopStatus = 0
+                    except Exception:
+                        pass
 
                 # reset old status
                 now = int(time.time() * 1000)
