@@ -621,7 +621,7 @@ class AutoRunTask():
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
 
-            rospy.loginfo("Connected to move base server")
+            rospy.logerror("Connected to move base server")
 
             if nav_status == 1 and task_needstop_now == 0 and not rospy.is_shutdown():
                 self.load_point()
