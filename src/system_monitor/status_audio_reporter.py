@@ -19,6 +19,8 @@ BLOCK_TIME_COUNT = 0
 STOP_TIME_COUNT = 0
 PREVIOUS_GREETING_FLAG = False
 
+WORKING_TIME_COUNT = 0
+
 POWER_NOW = 0.0
 WARN_TIME_COUNT = 0
 POWER_TIME_COUNT = 0
@@ -40,7 +42,7 @@ if __name__ == "__main__":
 
 
     def status_update_cb(status):
-        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT
+        global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT,WORKING_TIME_COUNT
         global MOVE_FLAG
         with STATUS_LOCK:
             if PREVISOUS_STATUS == None:
@@ -84,8 +86,17 @@ if __name__ == "__main__":
             if BLOCK_TIME_COUNT >= 5000:
                 BLOCK_TIME_COUNT = -10000
                 audio_pub.publish("您好，请让一下。机器人努力工作中。")
+
+            if status.targetStatus == 1 and (abs(status.currentSpeedX) > 0.01 or abs(status.currentSpeedTheta) > 0.01):
+                WORKING_TIME_COUNT += (1000 / 30)
+            else:
+                WORKING_TIME_COUNT = 0
+            if WORKING_TIME_COUNT >= 4000:
+                WORKING_TIME_COUNT = 0
+                audio_pub.publish("D")
+
             # 5min不动则关闭雷达
-            if PREVISOUS_STATUS.navStatus==1 and status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
+            if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
             else:
                 STOP_TIME_COUNT = 0
@@ -104,6 +115,11 @@ if __name__ == "__main__":
                         cmd = "rosservice call /start_motor"
                         subprocess.Popen(
                             cmd, shell=True, env=new_env)
+
+            #第一次开启服务时需要打开雷达，因为机器人开启运动要几秒，提高安全
+            if PREVISOUS_STATUS.navStatus == 0 and status.navStatus == 1:
+                if not rospy.get_param("/rplidar_node_manager/keep_running", True):
+                    rospy.set_param("/rplidar_node_manager/keep_running", True)
 
             PREVIOUS_GREETING_FLAG = rospy.get_param(
                 "/xiaoqiang_greeting_node/is_enabled", False)
