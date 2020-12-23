@@ -45,6 +45,11 @@ from std_msgs.msg import Bool, Float64, Int16, String, UInt32
 from system_monitor.msg import Status
 
 from config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH
+try:
+    from config import ALLOW_LOCAL_ONLY
+except ImportError:
+    ALLOW_LOCAL_ONLY = False
+
 from map_service import MapService
 from nav_task import NavigationTask
 from schedule_nav_task import ScheduleNavTask
@@ -60,6 +65,8 @@ class MonitorServer(threading.Thread):
                  host='', user_socket_port=20001, buf_size=1024):
         super(MonitorServer, self).__init__()
         self.host = host
+        if ALLOW_LOCAL_ONLY:
+            self.host = "127.0.0.1"
         self.usersocket_port = user_socket_port
         self.buf_size = buf_size
         self._stop = threading.Event()
