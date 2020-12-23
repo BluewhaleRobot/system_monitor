@@ -38,6 +38,7 @@ from geometry_msgs.msg import Pose, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Int16, Int32
 from system_monitor.msg import Status
+from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
 
 ORB_TRACK_THREAD = None
 ORB_INIT_FLAG = False
@@ -60,6 +61,13 @@ NAV_FLAG_PUB = None
 
 ENABLE_MOVE_FLAG = True
 
+WORKING_FLAG = False
+
+time2_diff_value = 0.0
+
+ORB_INIT_FLAG2 = False
+
+CHARGE_FLAG = False
 
 class TrackTask(threading.Thread):
 
@@ -120,57 +128,100 @@ def car_odom(odom):
 
 
 def camera_odom(campose):
-    global CAMERA_CURRENT_TIME, STATUS_LOCK, CAMERA_UPDATE_FLAG
+    global CAMERA_CURRENT_TIME, STATUS_LOCK, CAMERA_UPDATE_FLAG,ORB_INIT_FLAG2
     with STATUS_LOCK:
         CAMERA_CURRENT_TIME = rospy.Time.now()
         CAMERA_UPDATE_FLAG = True
-
+        ORB_INIT_FLAG2 = True
 
 def do_security():
     global STATUS_LOCK, CAR_UPDATE_FLAG, CAMERA_UPDATE_FLAG
     global CAMERA_CURRENT_TIME, CAR_CURRENT_TIME
     global GLOBAL_MOVE_PUB, VEL_PUB
     global NAV_FLAG_PUB, ENABLE_MOVE_FLAG, BAR_FLAG
+    global time2_diff_value,ORB_INIT_FLAG2,CHARGE_FLAG
 
     time_now = rospy.Time.now()
 
     STATUS_LOCK.acquire()
 
-    if CAR_UPDATE_FLAG:
+    time1_diff = time_now - time_now
+
+    if not CAR_UPDATE_FLAG :
         time1_diff = time_now - CAR_CURRENT_TIME
 
-    if CAMERA_UPDATE_FLAG:
+    if not CAMERA_UPDATE_FLAG:
         time2_diff = time_now - CAMERA_CURRENT_TIME
+
+        if time2_diff.to_sec()>1.0 :
+            time2_diff_value = time2_diff_value + time2_diff.to_sec()
+            CAMERA_CURRENT_TIME = time_now
+    else:
+        time2_diff_value = 0.0
+
+    if CHARGE_FLAG:
+        time2_diff_value =0.0
+
+    CHARGE_FLAG = False
+    CAMERA_UPDATE_FLAG = False
+    CAR_UPDATE_FLAG = False
 
     # 视觉丢失超时保险
     # 里程计丢失超时保险
-    if (CAMERA_UPDATE_FLAG and time2_diff.to_sec() > 180 and not BAR_FLAG) or time1_diff.to_sec() > 5.:
-        # 发布navFlag
-        if NAV_FLAG_PUB != None:
-            nav_flag = Bool()
-            nav_flag.data = True
-            NAV_FLAG_PUB.publish(nav_flag)
-        # 发布全局禁止ｆｌａｇ
+    if ORB_INIT_FLAG2 and ( time2_diff_value > 120 or time1_diff.to_sec() > 120.) and not BAR_FLAG and WORKING_FLAG:
+        # 发布全局禁止flag
         global_move_flag = Bool()
         global_move_flag.data = False
         GLOBAL_MOVE_PUB.publish(global_move_flag)
         car_twist = Twist()
         VEL_PUB.publish(car_twist)
-        CAMERA_UPDATE_FLAG = False
-        CAR_UPDATE_FLAG = False
+        ORB_INIT_FLAG2 = False
+        time2_diff_value = 0.0
         CAMERA_CURRENT_TIME = rospy.Time.now()
         CAR_CURRENT_TIME = rospy.Time.now()
+        rospy.logwarn("oups3 %d %d %f %f",BAR_FLAG,WORKING_FLAG,time2_diff.to_sec(),time1_diff.to_sec())
     STATUS_LOCK.release()
 
 
-def deal_car_status(car_status):
-    global BAR_FLAG
-    status = car_status.data
-    if status == 2:
-        BAR_FLAG = True
-    else:
-        BAR_FLAG = False
+# def deal_car_status(car_status):
+#     global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
+#     with STATUS_LOCK:
+#         status = car_status.data
+#         if status == 2:
+#             BAR_FLAG = True
+#             CAMERA_CURRENT_TIME = rospy.Time.now()
+#         else:
+#             BAR_FLAG = False
 
+def deal_car_status(car_twist_msg):
+    global BAR_FLAG, STATUS_LOCK,CAMERA_CURRENT_TIME
+    with STATUS_LOCK:
+        vx_temp = car_twist_msg.linear.x
+        theta_temp = car_twist_msg.angular.z
+
+        if abs(vx_temp) < 0.05 and abs(theta_temp) <0.05:
+            BAR_FLAG = True
+            CAMERA_CURRENT_TIME = rospy.Time.now()
+        else:
+            BAR_FLAG = False
+            #rospy.logwarn("robot stopped")
+
+
+def deal_galileo_status(galileo_msg):
+    global WORKING_FLAG, STATUS_LOCK,CAR_CURRENT_TIME,CAMERA_CURRENT_TIME,CHARGE_FLAG
+    with STATUS_LOCK:
+
+        if galileo_msg.targetStatus == 1:
+            WORKING_FLAG = True
+        else:
+            WORKING_FLAG = False
+            CAR_CURRENT_TIME = rospy.Time.now()
+            CAMERA_CURRENT_TIME = rospy.Time.now()
+
+        if galileo_msg.chargeStatus == 0:
+            CHARGE_FLAG = False
+        else:
+            CHARGE_FLAG = True
 
 def init():
     global ORB_INIT_FLAG, ORB_START_FLAG
@@ -188,7 +239,9 @@ def init():
     rospy.Subscriber("/system_monitor/report", Status, system_status_handler)
     rospy.Subscriber("/ORB_SLAM/Camera", Pose, camera_odom)
     rospy.Subscriber("/xqserial_server/Odom", Odometry, car_odom)
-    rospy.Subscriber("/xqserial_server/StatusFlag", Int32, deal_car_status)
+    #rospy.Subscriber("/xqserial_server/StatusFlag", Int32, deal_car_status)
+    rospy.Subscriber("/xqserial_server/Twist", Twist, deal_car_status)
+    rospy.Subscriber("/galileo/status", GalileoStatus, deal_galileo_status)
     GLOBAL_MOVE_PUB = rospy.Publisher('/global_move_flag', Bool, queue_size=1)
     NAV_FLAG_PUB = rospy.Publisher('/nav_setStop', Bool, queue_size=0)
     VEL_PUB = rospy.Publisher('/cmd_vel', Twist, queue_size=5)

@@ -38,15 +38,16 @@ from config import ROS_PACKAGE_PATH
 
 class NavigationService(threading.Thread):
     # orb_slam建图线程
-    def __init__(self, robot_status_lock, robot_status):
+    def __init__(self, galileo_status, galileo_status_lock):
         super(NavigationService, self).__init__()
         self._stop = threading.Event()
         self._stop.set()
         self.p = None
         self.ps_process = None
         self.speed = 1
-        self.robot_status_lock = robot_status_lock
-        self.robot_status = robot_status
+        self.galileo_status = galileo_status
+        self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
         if self.p != None:
@@ -59,7 +60,7 @@ class NavigationService(threading.Thread):
                 pass
         self.p = None
         self._stop.set()
-        self.__init__(self.robot_status_lock, self.robot_status)
+        self.__init__(self.galileo_status, self.galileo_status_lock)
 
     def stopped(self):
         return self._stop.isSet()
@@ -85,11 +86,7 @@ class NavigationService(threading.Thread):
                 self.p = subprocess.Popen(cmd, shell=True, env=new_env)
                 self.ps_process = psutil.Process(pid=self.p.pid)
             else:
-                if self.ps_process.is_running():
-                    self.robot_status_lock.acquire()
-                    self.robot_status.orbStartStatus = True
-                    self.robot_status_lock.release()
-                else:
+                if not self.ps_process.is_running():
                     break
             time.sleep(0.1)
         self.stop()

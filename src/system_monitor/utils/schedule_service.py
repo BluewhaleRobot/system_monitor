@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# Author: Randoms, Xiefusheng
+# Author: Randoms, Xie fusheng
 #
 
 import os
@@ -34,62 +34,60 @@ import psutil
 import rospy
 
 from config import ROS_PACKAGE_PATH
-from scale_orb import ScaleORB
 
 
-class MapService(threading.Thread):
-    # orb_slam建图线程
-    def __init__(self, robot_status_lock, robot_status, update=False):
-        super(MapService, self).__init__()
+class ScheduleService(threading.Thread):
+    def __init__(self, galileo_status, galileo_status_lock):
+        super(ScheduleService, self).__init__()
         self._stop = threading.Event()
         self._stop.set()
-        self.P = None
+        self.p = None
         self.ps_process = None
-        self.scale_orb_thread = None
-        self.robot_status_lock = robot_status_lock
-        self.robot_status = robot_status
-        self.update = update
+        self.speed = 1
+        self.galileo_status = galileo_status
+        self.galileo_status_lock = galileo_status_lock
+        self.fake_flag = rospy.get_param("~fake", False)
 
     def stop(self):
-        if self.scale_orb_thread != None:
-            self.scale_orb_thread.stop()
-            self.scale_orb_thread = None
-
-        if self.P != None:
-            self.ps_process = psutil.Process(pid=self.P.pid)
-            for child in self.ps_process.children(recursive=True):
-                child.kill()
-            self.ps_process.kill()
-        self.P = None
+        if self.p != None:
+            try:
+                self.ps_process = psutil.Process(pid=self.p.pid)
+                for child in self.ps_process.children(recursive=True):
+                    child.kill()
+                self.ps_process.kill()
+            except Exception:
+                pass
+        self.p = None
         self._stop.set()
-        self.__init__(self.robot_status_lock, self.robot_status)
+        self.__init__(self.galileo_status, self.galileo_status_lock)
 
     def stopped(self):
         return self._stop.isSet()
 
+    def setspeed(self, speed):
+        self.speed = speed
+
     def run(self):
         self._stop.clear()
-        cmd = "roslaunch ORB_SLAM2 map.launch"
-        if self.update:
-            cmd = "roslaunch nav_test update_map.launch"
+        if self.speed == 1:
+            cmd = "roslaunch lagrange_navigation navigation.launch"
+        elif self.speed == 2:
+            cmd = "roslaunch lagrange_navigation navigation.launch"
+        elif self.speed == 3:
+            cmd = "roslaunch lagrange_navigation navigation.launch"
+        elif self.speed == 0:
+            cmd = "roslaunch lagrange_navigation navigation.launch"
+        if self.fake_flag:
+            cmd = "roslaunch lagrange_navigation fake.launch"
+
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
         while not self.stopped() and not rospy.is_shutdown():
-            if self.P == None and not self.stopped():
-                self.P = subprocess.Popen(cmd, shell=True, env=new_env)
-                self.ps_process = psutil.Process(pid=self.P.pid)
+            if self.p == None and not self.stopped():
+                self.p = subprocess.Popen(cmd, shell=True, env=new_env)
+                self.ps_process = psutil.Process(pid=self.p.pid)
             else:
-                if self.ps_process.is_running():
-                    self.robot_status_lock.acquire()
-                    self.robot_status.orbStartStatus = True
-                    self.robot_status_lock.release()
-                    if self.scale_orb_thread == None:
-                        self.scale_orb_thread = ScaleORB(self.robot_status)
-                        self.scale_orb_thread.start()
-                else:
-                    if self.scale_orb_thread != None:
-                        self.scale_orb_thread.stop()
-                        self.scale_orb_thread = None
+                if not self.ps_process.is_running():
                     break
             time.sleep(0.1)
         self.stop()
