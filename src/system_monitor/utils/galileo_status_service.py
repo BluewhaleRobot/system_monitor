@@ -260,15 +260,19 @@ class GalileoStatusService(threading.Thread):
                             if "index" in nav_task_info and nav_task_info["index"] != -1:
                                 self.galileo_status.targetNumID = nav_task_info["index"]
                             self.galileo_status.targetDistance = nav_task_info["current_distance"]
-                        res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
-                        if res.status_code == 200:
-                            task_info = json.loads(res.content.decode("utf-8"))
-                            if task_info["state"] == "CANCELLED" or task_info["state"] == "ERROR" or task_info["state"] == "COMPLETE":
-                                self.galileo_status.loopStatus = 0    
+                    except Exception:
+                        pass
+                    try:
+                        if self.galileo_status.loopStatus == 0:
+                            res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
+                            if res.status_code == 200:
+                                task_info = json.loads(res.content.decode("utf-8"))
+                                if task_info["state"] == "CANCELLED" or task_info["state"] == "ERROR" or task_info["state"] == "COMPLETE":
+                                    self.galileo_status.loopStatus = 0    
+                                else:
+                                    self.galileo_status.loopStatus = 1
                             else:
-                                self.galileo_status.loopStatus = 1
-                        else:
-                            self.galileo_status.loopStatus = 0
+                                self.galileo_status.loopStatus = 0
                     except Exception:
                         pass
 
