@@ -592,10 +592,10 @@ class AutoRunTask():
             while nav_status != 1 and task_needstop_now == 0 :
                 try:
                     requests.get("http://127.0.0.1:3546/api/v1/navigation/start?map={map}&path={path}"
-                        .format(map=self.mapName, path=self.pathName))
+                        .format(map=self.mapName.encode('utf-8'), path=self.pathName.encode('utf-8')))
                 except Exception as e:
                     rospy.logwarn(e)
-                
+
                 time.sleep(10)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
@@ -614,7 +614,7 @@ class AutoRunTask():
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
 
-            rospy.loginfo("Connected to move base server")
+            rospy.logwarn("Connected to move base server %s %s",str(serverlag),str(task_needstop_now))
 
             if nav_status == 1 and task_needstop_now == 0 and not rospy.is_shutdown():
                 self.load_point()
