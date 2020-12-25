@@ -6,7 +6,7 @@ import actionlib
 from actionlib_msgs.msg import *
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_msgs.msg import Bool, String
-from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
+from galileo_serial_server.msg import GalileoStatus
 import time
 import rosservice
 import subprocess
@@ -82,7 +82,7 @@ def status_update_cb(status):
             else:
                 POWER_RECORDS.pop(0)
                 POWER_RECORDS.append(status.power)
-            POWER_NOW = sum(POWER_RECORDS) / len(POWER_RECORDS);
+            POWER_NOW = sum(POWER_RECORDS) / len(POWER_RECORDS)
         CHARGE_FLAG = status.chargeStatus
 
 def change_map(map_name, path_name):
@@ -219,38 +219,38 @@ class MapSwitchTask():
             #先关闭
             rospy.set_param("/system_monitor/nav_is_enabled", False)
             AUDIO_PUB.publish("地图切换成功, 开始重新载入导航任务")
-            galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'm' + chr(0x04)
-            galileo_cmds.length = len(galileo_cmds.data)
-            galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
             task_needstop_now = 0
             while nav_status == 1 and task_needstop_now == 0:
-                GALILEO_PUB.publish(galileo_cmds)
+                try:
+                    requests.get("http://127.0.0.1:3546/api/v1/navigation/stop")
+                except Exception as e:
+                    rospy.logwarn(e)
                 time.sleep(3)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >20:
                     break
             #再重新开启
             rospy.set_param("/system_monitor/nav_is_enabled", True)
             nav_status = 0
-            galileo_cmds.data = 'm' + chr(0x00)
-            galileo_cmds.length = len(galileo_cmds.data)
-            galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
             task_needstop_now = 0
             while nav_status != 1 and task_needstop_now == 0:
-                GALILEO_PUB.publish(galileo_cmds)
+                try:
+                    requests.get("http://127.0.0.1:3546/api/v1/navigation/start?map={map}&path={path}".
+                        format(map=self.mapName, path=self.pathName))
+                except Exception as e:
+                    rospy.logwarn(e)
                 time.sleep(30)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >10:
                     break
             STATUS_LOCK.acquire()
@@ -300,7 +300,7 @@ class AutoRunTask():
             try:
                 payload = {"id": self.looptaskid}
                 r = requests.get('http://127.0.0.1:3546/api/v1/task', params=payload, timeout=5)
-                if r.status_code == requests.codes.ok:
+                if r.status_code == 200:
                     task_details = r.json()
                     self.looptask_state = task_details["state"]
 
@@ -364,7 +364,7 @@ class AutoRunTask():
                             "loop_flag": True
                           }
                 r = requests.post('http://127.0.0.1:3546/api/v1/task', json=payload, timeout=5)
-                if r.status_code == requests.codes.ok:
+                if r.status_code == 200:
                     task_details = r.json()
                     self.looptaskid = task_details["id"]
 
@@ -404,19 +404,13 @@ class AutoRunTask():
                     break
 
                 if self.looptask_state == "CANCELLED" and nav_status == 1 and charge_flag_now ==2 and not self.looptaskflag:
-                    #停止充电
-                    galileo_cmds = GalileoNativeCmds()
-                    galileo_cmds.data = 'j' + chr(0x01)
-                    galileo_cmds.length = len(galileo_cmds.data)
-                    galileo_cmds.header.stamp = rospy.Time.now()
-                    GALILEO_PUB.publish(galileo_cmds)
                     #重启任务
                     time.sleep(3)
                     if len(self.waypoints) > 0:
                         payload3 = {'id': self.looptaskid}
 
                         r3 = requests.get('http://127.0.0.1:3546/api/v1/task/start', params=payload3, timeout=5)
-                        if r3.status_code == requests.codes.ok:
+                        if r3.status_code == 200:
                             task_details = r.json()
                             self.looptaskid = task_details["id"]
                             print(self.looptaskid)
@@ -435,7 +429,7 @@ class AutoRunTask():
             if self.stopPose <0:
                 #回去充电
                 r = requests.get('http://127.0.0.1:3546/api/v1/navigation/go_charge', timeout=5)
-                if r.status_code == requests.codes.ok:
+                if r.status_code == 200:
                     task_details = r.json()
                     taskid = task_details["id"]
             else:
@@ -449,7 +443,7 @@ class AutoRunTask():
                                 ],
                               }
                     r = requests.post('http://127.0.0.1:3546/api/v1/task', json=payload, timeout=5)
-                    if r.status_code == requests.codes.ok:
+                    if r.status_code == 200:
                         task_details = r.json()
                         taskid = task_details["id"]
 
@@ -464,7 +458,7 @@ class AutoRunTask():
                 time.sleep(1)
                 payload = {'id': taskid}
                 r = requests.get('http://127.0.0.1:3546/api/v1/task', params=payload, timeout=5)
-                if r.status_code == requests.codes.ok:
+                if r.status_code == 200:
                     task_details = r.json()
                     if task_details["state"] == "CANCELLED" or  task_details["state"] == "ERROR" or task_details["state"] == "COMPLETE":
                         break
@@ -480,23 +474,22 @@ class AutoRunTask():
 
         #停止导航
         rospy.set_param("/system_monitor/nav_is_enabled", False)
-        galileo_cmds = GalileoNativeCmds()
-        galileo_cmds.data = 'm' + chr(0x04)
-        galileo_cmds.length = len(galileo_cmds.data)
-        galileo_cmds.header.stamp = rospy.Time.now()
         max_do = 0
         STATUS_LOCK.acquire()
         nav_status = NAV_STATUS
         task_needstop_now = TASK_NEEDSTOP
         STATUS_LOCK.release()
         while nav_status == 1 and task_needstop_now == 0:
-            GALILEO_PUB.publish(galileo_cmds)
+            try:
+                requests.get("http://127.0.0.1:3546/api/v1/navigation/stop")
+            except Exception as e:
+                rospy.logwarn(e)
             time.sleep(10)
             STATUS_LOCK.acquire()
             nav_status = NAV_STATUS
             task_needstop_now = TASK_NEEDSTOP
             STATUS_LOCK.release()
-            max_do = max_do +1;
+            max_do = max_do +1
             if max_do >20:
                 break
         rospy.set_param("/system_monitor/nav_is_enabled", True)
@@ -522,11 +515,10 @@ class AutoRunTask():
         while charge_flag_now == 1 and self.ifneed_runnow() and not rospy.is_shutdown():
             if power_now_value > POWER_LOW:
                 #停止充电
-                galileo_cmds = GalileoNativeCmds()
-                galileo_cmds.data = 'j' + chr(0x01)
-                galileo_cmds.length = len(galileo_cmds.data)
-                galileo_cmds.header.stamp = rospy.Time.now()
-                GALILEO_PUB.publish(galileo_cmds)
+                try:
+                    requests.get("http://127.0.0.1:3546/api/v1/navigation/stop_charge")
+                except Exception as e:
+                    rospy.logwarn(e)
             time.sleep(3)
             STATUS_LOCK.acquire()
             charge_flag_now = CHARGE_FLAG
@@ -535,11 +527,10 @@ class AutoRunTask():
 
         while charge_flag_now == 2 and self.ifneed_runnow() and not rospy.is_shutdown():
             #停止充电
-            galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'j' + chr(0x01)
-            galileo_cmds.length = len(galileo_cmds.data)
-            galileo_cmds.header.stamp = rospy.Time.now()
-            GALILEO_PUB.publish(galileo_cmds)
+            try:
+                requests.get("http://127.0.0.1:3546/api/v1/navigation/stop_charge")
+            except Exception as e:
+                rospy.logwarn(e)
             time.sleep(3)
             STATUS_LOCK.acquire()
             charge_flag_now = CHARGE_FLAG
@@ -571,14 +562,14 @@ class AutoRunTask():
                 return
             rospy.set_param("/system_monitor/nav_is_enabled", False)
             AUDIO_PUB.publish("地图切换成功, 开始重新载入导航任务")
-            galileo_cmds = GalileoNativeCmds()
-            galileo_cmds.data = 'm' + chr(0x04)
-            galileo_cmds.length = len(galileo_cmds.data)
-            galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
             task_needstop_now = 0
             while nav_status == 1 and task_needstop_now == 0:
-                GALILEO_PUB.publish(galileo_cmds)
+                # 关闭导航
+                try:
+                    requests.get("http://127.0.0.1:3546/api/v1/navigation/stop")
+                except Exception as e:
+                    rospy.logwarn(e)
                 try:
                     r = requests.get('http://127.0.0.1:3546/api/v1/task/stop', timeout=5)
                 except Exception as e:
@@ -589,20 +580,22 @@ class AutoRunTask():
                 task_needstop_now = TASK_NEEDSTOP
                 nav_status = NAV_STATUS
                 STATUS_LOCK.release()
-                max_do = max_do +1;
+                max_do = max_do +1
                 if max_do >20:
                     break
             #再重新开启
             rospy.set_param("/system_monitor/nav_is_enabled", True)
             #第二步开始循环任务
             nav_status = 0
-            galileo_cmds.data = 'm' + chr(0x00)
-            galileo_cmds.length = len(galileo_cmds.data)
-            galileo_cmds.header.stamp = rospy.Time.now()
             max_do = 0
             task_needstop_now = 0
             while nav_status != 1 and task_needstop_now == 0 :
-                GALILEO_PUB.publish(galileo_cmds)
+                try:
+                    requests.get("http://127.0.0.1:3546/api/v1/navigation/start?map={map}&path={path}"
+                        .format(map=self.mapName.encode('utf-8'), path=self.pathName.encode('utf-8')))
+                except Exception as e:
+                    rospy.logwarn(e)
+
                 time.sleep(10)
                 STATUS_LOCK.acquire()
                 nav_status = NAV_STATUS
@@ -621,7 +614,7 @@ class AutoRunTask():
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
 
-            rospy.loginfo("Connected to move base server")
+            rospy.logwarn("Connected to move base server %s %s",str(serverlag),str(task_needstop_now))
 
             if nav_status == 1 and task_needstop_now == 0 and not rospy.is_shutdown():
                 self.load_point()
@@ -715,11 +708,9 @@ if __name__ == "__main__":
 
     AUDIO_PUB = rospy.Publisher("/xiaoqiang_tts/text", String, queue_size=10)
 
-    GALILEO_PUB = rospy.Publisher("/galileo/cmds", GalileoNativeCmds, queue_size=5)
-
     status_sub = rospy.Subscriber("/galileo/status", GalileoStatus, status_update_cb)
 
-    POWER_LOW = float(rospy.get_param("~power_low", "11.5"))
+    POWER_LOW = float(rospy.get_param("~power_low", "37.0"))
     #开始从json文件中加载地图切换任务
     time.sleep(60) #先等待开机1分钟
     load_tasks()
@@ -731,7 +722,7 @@ if __name__ == "__main__":
         #任务最多每分钟执行一次
         schedule.run_pending()
         #每10分钟检查一下任务是否要重新载入
-        if index_i >=3:
+        if index_i >= 3 * 60:
             index_i = 0
             filechange_handler.if_changed()
             FILESTATUS_LOCK.acquire()
@@ -741,4 +732,4 @@ if __name__ == "__main__":
             FILESTATUS_LOCK.release()
 
         index_i = index_i +1
-        time.sleep(60)
+        time.sleep(1)
