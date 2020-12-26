@@ -19,7 +19,6 @@ import threading
 import schedule
 import requests
 import hashlib
-import threading
 
 MAPS_DB_PATH = "/home/xiaoqiang/saved-slamdb"
 CURRENT_DB_PATH = "/home/xiaoqiang/slamdb"
@@ -712,7 +711,11 @@ if __name__ == "__main__":
 
     POWER_LOW = float(rospy.get_param("~power_low", "37.0"))
     #开始从json文件中加载地图切换任务
-    time.sleep(60) #先等待开机1分钟
+    timecount = 0
+    #先等待开机1分钟
+    while timecount < 60 and not rospy.is_shutdown():
+        time.sleep(1) 
+        timecount += 1
     load_tasks()
     index_i = 0
 
