@@ -47,4 +47,4 @@ SHARPLINK_LOG_FILE = "/home/xiaoqiang/Documents/ros/devel/lib/sharplink/server.l
 IOT_SECRET = "Jbk3GLKIZYIRrTgthbAEa9TlXHdae5UL"
 IOT_KEY = "a1Eb29fVWHG"
 IOT_PASSWORD = "xiaoqiang"
-ALLOW_LOCAL_ONLY = True
+ALLOW_LOCAL_ONLY = False

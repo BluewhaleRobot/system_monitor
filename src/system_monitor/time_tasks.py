@@ -6,7 +6,7 @@ import actionlib
 from actionlib_msgs.msg import *
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_msgs.msg import Bool, String
-from galileo_serial_server.msg import  GalileoStatus
+from galileo_serial_server.msg import GalileoStatus
 import time
 import rosservice
 import subprocess
@@ -19,6 +19,7 @@ import threading
 import schedule
 import requests
 import hashlib
+import threading
 
 MAPS_DB_PATH = "/home/xiaoqiang/saved-slamdb"
 CURRENT_DB_PATH = "/home/xiaoqiang/slamdb"
