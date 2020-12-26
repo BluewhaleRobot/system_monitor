@@ -37,7 +37,7 @@ from tf.transformations import euler_from_quaternion
 import tf
 import requests
 import json
-from config import POWER_LOW
+from .config import POWER_LOW
 
 
 class GalileoStatusService(threading.Thread):

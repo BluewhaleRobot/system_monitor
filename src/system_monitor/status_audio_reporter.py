@@ -9,7 +9,6 @@ import rosservice
 import subprocess
 import os
 import time
-import commands
 from std_msgs.msg import Bool, UInt32, Int32
 import threading
 from utils.config import POWER_LOW
