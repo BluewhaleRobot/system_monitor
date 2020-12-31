@@ -74,7 +74,7 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 1000: # 等待3秒
                 BLOCK_TIME_COUNT = -13000 # 每14秒说一次
-                audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+                audio_pub.publish("请让开一下，谢谢，机器人努力工作中。")
                 MOVE_FLAG = True
 
             if status.power > 5.0:
