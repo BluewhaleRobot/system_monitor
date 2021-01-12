@@ -85,13 +85,13 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 5000:
                 BLOCK_TIME_COUNT = -10000
-                audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
+                audio_pub.publish("请让一下，谢谢，机器人努力工作中！")
 
             if status.targetStatus == 1 and (abs(status.currentSpeedX) > 0.01 or abs(status.currentSpeedTheta) > 0.01):
                 WORKING_TIME_COUNT += (1000 / 30)
             else:
                 WORKING_TIME_COUNT = 0
-            if WORKING_TIME_COUNT >= 4000:
+            if WORKING_TIME_COUNT >= 2500:
                 WORKING_TIME_COUNT = 0
                 audio_pub.publish("D")
 
