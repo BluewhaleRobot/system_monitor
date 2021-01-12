@@ -4,6 +4,7 @@
 import rospy
 from std_msgs.msg import String
 from galileo_serial_server.msg import GalileoStatus
+from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 import time
 import rosservice
 import subprocess
@@ -38,7 +39,6 @@ if __name__ == "__main__":
             else:
                 MOVE_FLAG = True
 
-
     def status_update_cb(status):
         global PREVISOUS_STATUS, PREVIOUS_GREETING_FLAG, BLOCK_TIME_COUNT, STOP_TIME_COUNT, POWER_NOW, WARN_TIME_COUNT,POWER_TIME_COUNT
         global MOVE_FLAG
@@ -62,58 +62,77 @@ if __name__ == "__main__":
                 audio_pub.publish("开启迎宾模式")
             if PREVIOUS_GREETING_FLAG and not rospy.get_param("/xiaoqiang_greeting_node/is_enabled", False):
                 audio_pub.publish("关闭迎宾模式")
-
-            if status.power > 5.0:
-                POWER_NOW = POWER_NOW*0.8 + status.power*0.2
-                POWER_TIME_COUNT = POWER_TIME_COUNT +1
-
-            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.targetStatus !=1 and status.chargeStatus == 0:
-                POWER_TIME_COUNT = 601
-                #需要提示
-                WARN_TIME_COUNT += (1000 / 30)
-                if WARN_TIME_COUNT >= 1000: # 等待1秒
-                    WARN_TIME_COUNT = -26000 # 每27秒说一次
-                    audio_pub.publish("电量低，请充满电后再继续使用！")
-
+            if status.navStatus == 1 and PREVISOUS_STATUS.targetNumID != 0 and status.targetNumID == 0:
+                # 返回厨房提示
+                #audio_pub.publish("好的，我回去了，您慢用！")
+                pass
             # 被挡住提示
             if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
                 # 被人挡住了,在 WORKING 状态但是没有动
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
                 BLOCK_TIME_COUNT = 0
-            if BLOCK_TIME_COUNT >= 5000:
-                BLOCK_TIME_COUNT = -10000
-                audio_pub.publish("您好，请让一下。机器人努力工作中。")
+            if BLOCK_TIME_COUNT >= 1000: # 等待3秒
+                BLOCK_TIME_COUNT = -13000 # 每14秒说一次
+                audio_pub.publish("请让开一下，谢谢，机器人努力工作中。")
+                MOVE_FLAG = True
+
+            if status.power > 5.0:
+                POWER_NOW = POWER_NOW*0.8 + status.power*0.2
+                POWER_TIME_COUNT = POWER_TIME_COUNT +1
+
+            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.mapStatus !=1 and status.targetStatus !=1 :
+                POWER_TIME_COUNT = 601
+                if status.navStatus != 1 or status.targetNumID <=0 :
+                    #在厨房位置不工作就要切断电源
+                    WARN_TIME_COUNT = 0
+                    rospy.loginfo("system poweroff because power low 1 %f",POWER_NOW)
+                    audio_pub.publish("电量低，请充满电后再继续使用，系统将在2分钟后自动关机！")
+                    # 等待语音播放完毕
+                    time.sleep(8)
+                    if rosservice.get_service_node("/motor_driver/shutdown") is not None:
+                        # call shutdown service
+                        rospy.wait_for_service('/motor_driver/shutdown')
+                        shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
+                        req = ShutdownRequest()
+                        req.flag = True
+                        rospy.logwarn("Call shutdown service")
+                        res = shutdown_rpc(req)
+                        rospy.logwarn(res)
+                    rospy.loginfo("system poweroff because power low 2")
+                    commands.getstatusoutput(
+                        'sudo shutdown -h now')
+                else:
+                    #不在厨房位置则需要提示
+                    WARN_TIME_COUNT += (1000 / 30)
+                    if WARN_TIME_COUNT >= 1000: # 等待1秒
+                        WARN_TIME_COUNT = -16000 # 每17秒说一次
+                        audio_pub.publish("电量低，请充满电后再继续使用！")
+            else:
+                WARN_TIME_COUNT = 0
+
             # 5min不动则关闭雷达
             if status.targetStatus != 1 and abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01:
                 STOP_TIME_COUNT += (1000 / 30)
             else:
                 STOP_TIME_COUNT = 0
-            new_env = os.environ.copy()
             if STOP_TIME_COUNT >= 5 * 60 * 1000:
                 if rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", False)
-                    if rosservice.get_service_node("/stop_motor") is not None:
-                        cmd = "rosservice call /stop_motor"
-                        subprocess.Popen(
-                            cmd, shell=True, env=new_env)
             else:
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
-                    if rosservice.get_service_node("/start_motor") is not None:
-                        cmd = "rosservice call /start_motor"
-                        subprocess.Popen(
-                            cmd, shell=True, env=new_env)
 
             #第一次开启服务时需要打开雷达，因为机器人开启运动要几秒，提高安全
             if PREVISOUS_STATUS.navStatus == 0 and status.navStatus == 1:
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
-
+            
+            #开启建图时需要打开雷达，因为机器人开启运动要几秒
             if PREVISOUS_STATUS.mapStatus == 0 and status.mapStatus == 1:
                 if not rospy.get_param("/rplidar_node_manager/keep_running", True):
                     rospy.set_param("/rplidar_node_manager/keep_running", True)
-
+                    
             PREVIOUS_GREETING_FLAG = rospy.get_param(
                 "/xiaoqiang_greeting_node/is_enabled", False)
             PREVISOUS_STATUS = status
