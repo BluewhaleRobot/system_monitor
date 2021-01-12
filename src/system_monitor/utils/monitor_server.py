@@ -38,6 +38,7 @@ import rospy
 import tf
 import rosservice
 from galileo_serial_server.msg import GalileoNativeCmds, GalileoStatus
+from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 from geometry_msgs.msg import Pose, Pose2D, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64, Int16, String, UInt32, String
@@ -45,6 +46,10 @@ from system_monitor.msg import Status
 from dynamic_reconfigure.server import Server
 
 from .config import MAX_THETA, MAX_VEL, ROS_PACKAGE_PATH, ALLOW_LOCAL_ONLY
+try:
+    from .config import ALLOW_LOCAL_ONLY
+except ImportError:
+    ALLOW_LOCAL_ONLY = False
 from .map_service import MapService
 from .nav_task import NavigationTask
 from .schedule_nav_task import ScheduleNavTask
@@ -170,6 +175,16 @@ class MonitorServer(threading.Thread):
                     self.audio_pub.publish("请等待一分钟后，再切断总电源，谢谢！")
                     # 等待语音播放完毕
                     time.sleep(5)
+                    if rosservice.get_service_node("/motor_driver/shutdown") is not None:
+                        # call shutdown service
+                        rospy.wait_for_service('/motor_driver/shutdown')
+                        shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
+                        req = ShutdownRequest()
+                        req.flag = True
+                        rospy.logwarn("Call shutdown service")
+                        res = shutdown_rpc(req)
+                        rospy.logwarn(res)
+                    rospy.loginfo("system poweroff2")
                     shutdown_cmd = Popen('sudo shutdown -h now', shell=True)
                     shutdown_cmd.wait()
 

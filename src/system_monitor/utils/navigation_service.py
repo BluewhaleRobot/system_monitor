@@ -51,9 +51,10 @@ class NavigationService(threading.Thread):
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.fake_flag = rospy.get_param("~fake", False)
-        self.camera_feature = rospy.get_param("~camera_type", "mono")
-        self.navigation_cmd = "roslaunch galileo_navigation navigation.launch"
-        self.slam_cmd = "roslaunch galileo_navigation slam.launch camera_type:={type}".format(type=self.camera_feature)
+        self.camera_type = rospy.get_param("~camera_type", "mono")
+        self.navigation_cmd = "roslaunch galileo_navigation navigation.launch use_custom_setting:=true \
+            setting_file:=/home/xiaoqiang/Documents/ros/src/startup/params/navigation.yaml"
+        self.slam_cmd = "roslaunch galileo_navigation slam.launch camera_type:={type}".format(type=self.camera_type)
         
         if self.fake_flag:
             self.slam_cmd = "roslaunch galileo_navigation slam_fake.launch"

@@ -64,11 +64,9 @@ class MapService(threading.Thread):
             for child in self.ps_process.children(recursive=True):
                 child.kill()
             self.ps_process.kill()
-        os.system("pkill -f 'roslaunch ORB_SLAM2 map.launch'")
-        os.system("pkill -f 'roslaunch ORB_SLAM2 map_front.launch'")
-        os.system("pkill -f 'roslaunch ORB_SLAM2 map_back.launch'")
+        os.system("pkill -f 'roslaunch startup map.launch'")
         os.system("pkill -f 'roslaunch ORB_SLAM2 map_fake.launch'")
-        os.system("pkill -f 'roslaunch ORB_SLAM2 update.launch'")
+        os.system("pkill -f 'roslaunch startup update.launch'")
         os.system("pkill -f 'roslaunch ORB_SLAM2 update_fake.launch'")
         self.P = None
         self._stop.set()
@@ -81,17 +79,20 @@ class MapService(threading.Thread):
         self._stop.clear()
         # 多摄像头参数，0表示使用前摄像头建图，1表示使用后摄像头建图
         camera_id = int(rospy.get_param("~camera_id", -1))
-        cmd = "roslaunch ORB_SLAM2 map.launch"
+        calib_flag = rospy.get_param("~calib_flag", False)
+        cmd = "roslaunch startup map.launch"
         if camera_id == 0:
-            cmd = "roslaunch ORB_SLAM2 map_front.launch"
+            cmd = "roslaunch startup map.launch camera_type:=front"
         if camera_id == 1:
-            cmd = "roslaunch ORB_SLAM2 map_back.launch"
+            cmd = "roslaunch startup map.launch camera_type:=back"
         if self.fake_flag:
             cmd = "roslaunch ORB_SLAM2 map_fake.launch"
         if self.update:
-            cmd = "roslaunch ORB_SLAM2 update.launch"
+            cmd = "roslaunch startup update.launch"
             if self.fake_flag:
                 cmd = "roslaunch ORB_SLAM2 update_fake.launch"
+        if calib_flag:
+            cmd += " calib_flag:=true"
         new_env = os.environ.copy()
         new_env['ROS_PACKAGE_PATH'] = ROS_PACKAGE_PATH
         while not self.stopped() and not rospy.is_shutdown():

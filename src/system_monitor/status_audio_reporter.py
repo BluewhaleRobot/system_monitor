@@ -4,6 +4,7 @@
 import rospy
 from std_msgs.msg import String
 from galileo_serial_server.msg import GalileoStatus
+from xqserial_server.srv import Shutdown, ShutdownRequest, ShutdownResponse
 import time
 import rosservice
 import subprocess
@@ -68,13 +69,35 @@ if __name__ == "__main__":
                 POWER_NOW = POWER_NOW*0.8 + status.power*0.2
                 POWER_TIME_COUNT = POWER_TIME_COUNT +1
 
-            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.targetStatus !=1 and status.chargeStatus == 0:
+            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.mapStatus !=1 and status.targetStatus !=1 :
                 POWER_TIME_COUNT = 601
-                #需要提示
-                WARN_TIME_COUNT += (1000 / 30)
-                if WARN_TIME_COUNT >= 1000: # 等待1秒
-                    WARN_TIME_COUNT = -26000 # 每27秒说一次
-                    audio_pub.publish("电量低，请充满电后再继续使用！")
+                if status.navStatus != 1 or status.targetNumID <=0 :
+                    #在厨房位置不工作就要切断电源
+                    WARN_TIME_COUNT = 0
+                    rospy.loginfo("system poweroff because power low 1 %f",POWER_NOW)
+                    audio_pub.publish("电量低，请充满电后再继续使用，系统将在2分钟后自动关机！")
+                    # 等待语音播放完毕
+                    time.sleep(8)
+                    if rosservice.get_service_node("/motor_driver/shutdown") is not None:
+                        # call shutdown service
+                        rospy.wait_for_service('/motor_driver/shutdown')
+                        shutdown_rpc = rospy.ServiceProxy("/motor_driver/shutdown", Shutdown)
+                        req = ShutdownRequest()
+                        req.flag = True
+                        rospy.logwarn("Call shutdown service")
+                        res = shutdown_rpc(req)
+                        rospy.logwarn(res)
+                    rospy.loginfo("system poweroff because power low 2")
+                    commands.getstatusoutput(
+                        'sudo shutdown -h now')
+                else:
+                    #不在厨房位置则需要提示
+                    WARN_TIME_COUNT += (1000 / 30)
+                    if WARN_TIME_COUNT >= 1000: # 等待1秒
+                        WARN_TIME_COUNT = -16000 # 每17秒说一次
+                        audio_pub.publish("电量低，请充满电后再继续使用！")
+            else:
+                WARN_TIME_COUNT = 0
 
             # 被挡住提示
             if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
@@ -82,9 +105,10 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
                 BLOCK_TIME_COUNT = 0
-            if BLOCK_TIME_COUNT >= 5000:
-                BLOCK_TIME_COUNT = -10000
-                audio_pub.publish("您好，请让一下。赤兔机器人努力工作中。")
+            if BLOCK_TIME_COUNT >= 1000: # 等待3秒
+                BLOCK_TIME_COUNT = -13000 # 每14秒说一次
+                audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+                MOVE_FLAG = True
 
             if status.targetStatus == 1 and (abs(status.currentSpeedX) > 0.01 or abs(status.currentSpeedTheta) > 0.01):
                 WORKING_TIME_COUNT += (1000 / 30)

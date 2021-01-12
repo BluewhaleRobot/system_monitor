@@ -50,7 +50,8 @@ class ScheduleService(threading.Thread):
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.fake_flag = rospy.get_param("~fake", False)
-        self.navigation_cmd = "roslaunch lagrange_navigation navigation.launch"
+        self.navigation_cmd = "roslaunch lagrange_navigation navigation.launch use_custom_setting:=true \
+            setting_file:=/home/xiaoqiang/Documents/ros/src/startup/params/lagrange.yaml"
         self.slam_cmd = "roslaunch lagrange_navigation slam.launch"
         if self.fake_flag:
             self.slam_cmd = "roslaunch lagrange_navigation slam_fake.launch"
