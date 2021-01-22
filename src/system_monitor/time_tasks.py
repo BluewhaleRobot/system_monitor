@@ -632,7 +632,9 @@ class AutoRunTask():
 
             if nav_status == 1 and task_needstop_now == 0 and not rospy.is_shutdown():
                 self.load_point()
+                rospy.set_param("/xqserial_server/params/out1", 1)
                 self.doloop_task()
+                rospy.set_param("/xqserial_server/params/out1", 0)
                 STATUS_LOCK.acquire()
                 task_needstop_now = TASK_NEEDSTOP
                 STATUS_LOCK.release()
