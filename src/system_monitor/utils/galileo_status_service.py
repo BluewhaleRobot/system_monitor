@@ -66,6 +66,10 @@ class GalileoStatusService(threading.Thread):
         self.galileo_status = galileo_status
         self.galileo_status_lock = galileo_status_lock
         self.listener = tf.TransformListener(True, rospy.Duration(10.0))
+        self.nav_action_cache = None
+        self.nav_action_time = 0
+        self.loop_task_cache = None
+        self.loop_task_time = 0
 
         # stop flag
         self._stop = threading.Event()
@@ -136,7 +140,7 @@ class GalileoStatusService(threading.Thread):
         self.gc_sub.unregister()
         self.gba_sub.unregister()
         self.charge_sub.unregister()
-        self.power_sub.unregister()
+        # self.power_sub.unregister()
         self.power_sub2.unregister()
         self.current_speed_sub.unregister()
         self.control_speed_sub.unregister()
@@ -246,36 +250,26 @@ class GalileoStatusService(threading.Thread):
 
                 # 兼容http api状态，根据galieo api任务状态更新galileo status
                 if self.galileo_status.navStatus == 1:
-                    try:
-                        res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
-                        if res.status_code == 200:
-                            # 正在执行 nav action
-                            nav_task_info = json.loads(res.content.decode("utf-8"))
-                            self.galileo_status.targetNumID = -2
-                            if nav_task_info["state"] == "WORKING":
-                                self.galileo_status.targetStatus = 1
-                                self.galileo_status.angleGoalStatus = 0
-                            if nav_task_info["state"] == "PAUSED":
-                                self.galileo_status.targetStatus = 2
-                                self.galileo_status.angleGoalStatus = 2
-                            if "index" in nav_task_info and nav_task_info["index"] != -1:
-                                self.galileo_status.targetNumID = nav_task_info["index"]
-                            self.galileo_status.targetDistance = nav_task_info["current_distance"]
-                    except Exception:
-                        pass
-                    try:
-                        if self.galileo_status.loopStatus == 0:
-                            res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
-                            if res.status_code == 200:
-                                task_info = json.loads(res.content.decode("utf-8"))
-                                if task_info["state"] == "CANCELLED" or task_info["state"] == "ERROR" or task_info["state"] == "COMPLETE":
-                                    self.galileo_status.loopStatus = 0    
-                                else:
-                                    self.galileo_status.loopStatus = 1
-                            else:
-                                self.galileo_status.loopStatus = 0
-                    except Exception:
-                        pass
+                    nav_task_info = self.get_current_nav_action()
+                    if nav_task_info is not None:
+                        self.galileo_status.targetNumID = -2
+                        if nav_task_info["state"] == "WORKING":
+                            self.galileo_status.targetStatus = 1
+                            self.galileo_status.angleGoalStatus = 0
+                        if nav_task_info["state"] == "PAUSED":
+                            self.galileo_status.targetStatus = 2
+                            self.galileo_status.angleGoalStatus = 2
+                        if "index" in nav_task_info and nav_task_info["index"] != -1:
+                            self.galileo_status.targetNumID = nav_task_info["index"]
+                        self.galileo_status.targetDistance = nav_task_info["current_distance"]
+                    task_info = self.get_last_loop_task()
+                    if task_info is not None:
+                        if task_info["state"] == "CANCELLED" or task_info["state"] == "ERROR" or task_info["state"] == "COMPLETE":
+                            self.galileo_status.loopStatus = 0    
+                        else:
+                            self.galileo_status.loopStatus = 1
+                    else:
+                        self.galileo_status.loopStatus = 0
 
                 # reset old status
                 now = int(time.time() * 1000)
@@ -307,3 +301,34 @@ class GalileoStatusService(threading.Thread):
 
             self.galileo_pub.publish(self.galileo_status)
             rate.sleep()
+
+    def get_current_nav_action(self):
+        if time.time() - self.nav_action_time > 1:
+            try:
+                self.nav_action_time = time.time()
+                res = requests.get("http://127.0.0.1:3546/api/v1/task?id=current_nav_action")
+                if res.status_code == 200:
+                    # 正在执行 nav action
+                    self.nav_action_cache = json.loads(res.content.decode("utf-8"))
+                else:
+                    self.nav_action_cache = None
+            except Exception:
+                self.nav_action_cache = None
+        return self.nav_action_cache
+            
+
+    def get_last_loop_task(self):
+        if time.time() - self.loop_task_time > 1:
+            try:
+                self.loop_task_time = time.time()
+                res = requests.get("http://127.0.0.1:3546/api/v1/navigation/loop_task")
+                if res.status_code == 200:
+                    # 正在执行 nav action
+                    self.loop_task_cache = json.loads(res.content.decode("utf-8"))
+                else:
+                    self.loop_task_cache = None
+            except Exception:
+                self.loop_task_cache = None
+        return self.loop_task_cache
+
+        
