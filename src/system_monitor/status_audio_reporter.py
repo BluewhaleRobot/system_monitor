@@ -69,7 +69,7 @@ if __name__ == "__main__":
                 POWER_NOW = POWER_NOW*0.8 + status.power*0.2
                 POWER_TIME_COUNT = POWER_TIME_COUNT +1
 
-            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and status.power > 5.0 and status.mapStatus !=1 and status.targetStatus !=1 :
+            if POWER_TIME_COUNT > 600 and POWER_NOW < POWER_LOW and POWER_NOW > POWER_LOW / 2 and status.power > 5.0 and status.mapStatus !=1 and status.targetStatus !=1 :
                 POWER_TIME_COUNT = 601
                 if status.navStatus != 1 or status.targetNumID <=0 :
                     #在厨房位置不工作就要切断电源
@@ -88,8 +88,8 @@ if __name__ == "__main__":
                         res = shutdown_rpc(req)
                         rospy.logwarn(res)
                     rospy.loginfo("system poweroff because power low 2")
-                    commands.getstatusoutput(
-                        'sudo shutdown -h now')
+                    cmd = "sudo shutdown -h now"
+                    subprocess.Popen(cmd, shell=True)
                 else:
                     #不在厨房位置则需要提示
                     WARN_TIME_COUNT += (1000 / 30)
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 BLOCK_TIME_COUNT = 0
             if BLOCK_TIME_COUNT >= 1000: # 等待3秒
                 BLOCK_TIME_COUNT = -13000 # 每14秒说一次
-                audio_pub.publish("请让开一下，谢谢，布丁机器人努力工作中！")
+                audio_pub.publish("请让开一下，谢谢，赤兔机器人努力工作中！")
                 MOVE_FLAG = True
 
             if status.targetStatus == 1 and (abs(status.currentSpeedX) > 0.01 or abs(status.currentSpeedTheta) > 0.01):
