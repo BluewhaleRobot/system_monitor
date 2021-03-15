@@ -100,7 +100,7 @@ if __name__ == "__main__":
                 WARN_TIME_COUNT = 0
 
             # 被挡住提示
-            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.01):
+            if status.targetStatus == 1 and (not MOVE_FLAG or abs(status.currentSpeedX) < 0.01 and abs(status.currentSpeedTheta) < 0.005):
                 # 被人挡住了,在 WORKING 状态但是没有动
                 BLOCK_TIME_COUNT += (1000 / 30)
             else:
